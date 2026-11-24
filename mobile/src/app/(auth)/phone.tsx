@@ -1,8 +1,6 @@
-import { getLocales } from 'expo-localization';
 import { router } from 'expo-router';
 import {
   AsYouType,
-  getCountries,
   isPossiblePhoneNumber,
   parsePhoneNumber,
   type CountryCode,
@@ -21,8 +19,8 @@ import { useRecaptchaVerifier } from '@/features/auth/RecaptchaProvider';
 import { colors, spacing } from '@/theme';
 
 function defaultCountry(): CountryCode {
-  const region = getLocales()[0]?.regionCode?.toUpperCase();
-  return region && (getCountries() as string[]).includes(region) ? (region as CountryCode) : 'US';
+  // VOYC Date launches in India — always start on +91; users can still pick another country.
+  return 'IN';
 }
 
 export default function PhoneScreen() {

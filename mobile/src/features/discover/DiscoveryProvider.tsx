@@ -29,7 +29,7 @@ function feedErrorMessage(error: unknown) {
 type DiscoveryValue = {
   status: FeedStatus;
   error: string | null;
-  /** Undecided profiles only — free to scroll until Like / Pass / Save. */
+  /** Undecided profiles for the Discover card deck. */
   cards: DiscoverCard[];
   exhausted: boolean;
   lastMatch: MatchResult | null;

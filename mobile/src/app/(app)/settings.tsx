@@ -1,8 +1,19 @@
 import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
-import { ChevronRight, X } from 'lucide-react-native';
-import { useState } from 'react';
+import {
+  Ban,
+  ChevronRight,
+  Download,
+  FileText,
+  HelpCircle,
+  LogOut,
+  Shield,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from 'lucide-react-native';
+import { useState, type ReactNode } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { AppText, Button, IconButton, Screen } from '@/components/ui';
@@ -11,23 +22,39 @@ import { useSession } from '@/features/auth/SessionProvider';
 import { useMyProfile } from '@/features/profile/MyProfileProvider';
 import { colors, radii, spacing } from '@/theme';
 
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <View style={styles.section}>
+      <AppText variant="label" color="textMuted" style={styles.sectionLabel}>
+        {title}
+      </AppText>
+      <View style={styles.group}>{children}</View>
+    </View>
+  );
+}
+
 function Row({
+  icon,
   title,
   subtitle,
   onPress,
   danger,
+  last,
 }: {
+  icon?: ReactNode;
   title: string;
   subtitle?: string;
   onPress?: () => void;
   danger?: boolean;
+  last?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole={onPress ? 'button' : undefined}
       onPress={onPress}
       disabled={!onPress}
-      style={styles.row}>
+      style={({ pressed }) => [styles.row, last && styles.rowLast, pressed && onPress && styles.pressed]}>
+      {icon ? <View style={styles.rowIcon}>{icon}</View> : null}
       <View style={styles.rowText}>
         <AppText variant="bodyStrong" color={danger ? 'danger' : 'text'}>
           {title}
@@ -48,14 +75,16 @@ function ToggleRow({
   subtitle,
   value,
   onChange,
+  last,
 }: {
   title: string;
   subtitle: string;
   value: boolean;
   onChange: (next: boolean) => void;
+  last?: boolean;
 }) {
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, last && styles.rowLast]}>
       <View style={styles.rowText}>
         <AppText variant="bodyStrong">{title}</AppText>
         <AppText variant="caption" color="textMuted">
@@ -110,7 +139,7 @@ export default function SettingsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            Alert.alert('Are you sure?', 'Type confirmation by tapping Delete forever.', [
+            Alert.alert('Are you sure?', 'Tap Delete forever to confirm.', [
               { text: 'Cancel', style: 'cancel' },
               {
                 text: 'Delete forever',
@@ -141,23 +170,23 @@ export default function SettingsScreen() {
           <IconButton accessibilityLabel="Close" onPress={router.back} icon={<X size={20} color={colors.plum} />} />
         </View>
       }>
-      <AppText variant="label" style={styles.sectionLabel}>
-        Discovery
-      </AppText>
-      <View style={styles.group}>
-        <Row title="Filters" subtitle="Age, distance and who you see" onPress={() => router.push('/(app)/filters')} />
+      <Section title="Discovery">
+        <Row
+          icon={<SlidersHorizontal size={18} color={colors.plum} />}
+          title="Filters"
+          subtitle="Age, distance and who you see"
+          onPress={() => router.push('/(app)/filters')}
+        />
         <ToggleRow
-          title="Pause profile"
-          subtitle="Hidden from Discover · matches stay open"
+          title="Pause my profile"
+          subtitle="Hidden on Discover · matches stay open"
           value={paused}
           onChange={(next) => setPaused(next).catch(() => Alert.alert('Couldn’t update pause'))}
+          last
         />
-      </View>
+      </Section>
 
-      <AppText variant="label" style={styles.sectionLabel}>
-        Privacy
-      </AppText>
-      <View style={styles.group}>
+      <Section title="Privacy">
         <ToggleRow
           title="Show my age"
           subtitle="Others see your age on Discover"
@@ -170,31 +199,58 @@ export default function SettingsScreen() {
           value={showDistance}
           onChange={(next) => savePreferences({ showDistance: next })}
         />
-        <Row title="Blocked users" onPress={() => router.push('/(app)/blocked')} />
-      </View>
+        <Row
+          icon={<Ban size={18} color={colors.plum} />}
+          title="Blocked users"
+          onPress={() => router.push('/(app)/blocked')}
+          last
+        />
+      </Section>
 
-      <AppText variant="label" style={styles.sectionLabel}>
-        Support & legal
-      </AppText>
-      <View style={styles.group}>
-        <Row title="Help & support" onPress={() => Linking.openURL('mailto:hello@voyc.date?subject=VOYC%20Date%20help')} />
-        <Row title="Community guidelines" onPress={() => Linking.openURL('https://voyc.date/guidelines')} />
-        <Row title="Privacy policy" onPress={() => Linking.openURL('https://voyc.date/privacy')} />
-        <Row title="Terms of use" onPress={() => Linking.openURL('https://voyc.date/terms')} />
-      </View>
+      <Section title="Support">
+        <Row
+          icon={<HelpCircle size={18} color={colors.plum} />}
+          title="Help & support"
+          onPress={() => Linking.openURL('mailto:hello@voyc.date?subject=VOYC%20Date%20help')}
+        />
+        <Row
+          icon={<Shield size={18} color={colors.plum} />}
+          title="Community guidelines"
+          onPress={() => Linking.openURL('https://voyc.date/guidelines')}
+        />
+        <Row
+          icon={<FileText size={18} color={colors.plum} />}
+          title="Privacy policy"
+          onPress={() => Linking.openURL('https://voyc.date/privacy')}
+        />
+        <Row
+          icon={<FileText size={18} color={colors.plum} />}
+          title="Terms of use"
+          onPress={() => Linking.openURL('https://voyc.date/terms')}
+          last
+        />
+      </Section>
 
-      <AppText variant="label" style={styles.sectionLabel}>
-        Account
-      </AppText>
-      <View style={styles.group}>
-        <Row title="Download my data" subtitle="JSON export of your account" onPress={exportData} />
-        <Row title="Sign out" onPress={signOut} />
-        <Row title="Delete account" danger onPress={confirmDelete} />
-      </View>
+      <Section title="Account">
+        <Row
+          icon={<Download size={18} color={colors.plum} />}
+          title="Download my data"
+          subtitle="JSON export of your account"
+          onPress={exportData}
+        />
+        <Row icon={<LogOut size={18} color={colors.plum} />} title="Sign out" onPress={signOut} />
+        <Row
+          icon={<Trash2 size={18} color={colors.danger} />}
+          title="Delete account"
+          danger
+          onPress={confirmDelete}
+          last
+        />
+      </Section>
 
-      {(exporting || deleting) && (
+      {exporting || deleting ? (
         <Button title={deleting ? 'Deleting…' : 'Exporting…'} loading disabled />
-      )}
+      ) : null}
     </Screen>
   );
 }
@@ -205,9 +261,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  section: {
+    marginBottom: spacing.md,
+  },
   sectionLabel: {
-    marginTop: spacing.lg,
     marginBottom: spacing.xs,
+    marginLeft: spacing.xs,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   group: {
     borderRadius: radii.md,
@@ -224,6 +285,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.pinkBorder,
+  },
+  rowLast: {
+    borderBottomWidth: 0,
+  },
+  pressed: {
+    backgroundColor: colors.pinkTint,
+  },
+  rowIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.pinkTint,
   },
   rowText: {
     flex: 1,

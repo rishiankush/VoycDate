@@ -1,6 +1,13 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { ChevronRight, Eye, PauseCircle, Pencil, Settings } from 'lucide-react-native';
+import {
+  ChevronRight,
+  Eye,
+  PauseCircle,
+  Pencil,
+  Settings,
+  MapPin,
+} from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
@@ -10,11 +17,12 @@ import { placeLabel, readDeviceLocation } from '@/features/location/deviceLocati
 import { TabScreen } from '@/features/navigation/TabScreen';
 import { MODES } from '@/features/onboarding/options';
 import type { Mode } from '@/features/onboarding/types';
+import { ageFromBirthDate } from '@/features/profile/age';
 import { profileCompleteness } from '@/features/profile/completeness';
 import { useMyProfile } from '@/features/profile/MyProfileProvider';
-import { colors, radii, spacing } from '@/theme';
+import { colors, radii, shadows, spacing } from '@/theme';
 
-function Row({
+function MenuRow({
   icon,
   title,
   subtitle,
@@ -26,7 +34,7 @@ function Row({
   onPress: () => void;
 }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.row}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <View style={styles.rowIcon}>{icon}</View>
       <View style={styles.rowText}>
         <AppText variant="bodyStrong">{title}</AppText>
@@ -49,6 +57,7 @@ export default function ProfileScreen() {
   const photo = profile.photos?.[0];
   const { percent, done, total } = profileCompleteness(profile);
   const mode = profile.mode ?? 'date';
+  const age = record?.birthDate ? ageFromBirthDate(record.birthDate) : null;
 
   const updateLocation = async () => {
     setUpdatingLocation(true);
@@ -91,46 +100,66 @@ export default function ProfileScreen() {
 
   return (
     <TabScreen title="Profile">
-      <View style={styles.card}>
-        {photo ? <Image source={{ uri: photo.url }} style={styles.photo} contentFit="cover" /> : null}
-        <AppText variant="title">{profile.firstName}</AppText>
+      <View style={styles.hero}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Preview how others see you"
+          onPress={() => router.push('/(app)/preview-profile')}
+          style={styles.photoWrap}>
+          {photo ? (
+            <Image source={{ uri: photo.url }} style={styles.photo} contentFit="cover" />
+          ) : (
+            <View style={[styles.photo, styles.photoEmpty]} />
+          )}
+          <View style={styles.percentBadge}>
+            <AppText variant="label" color="white">
+              {percent}%
+            </AppText>
+          </View>
+        </Pressable>
+
+        <AppText variant="title" align="center">
+          {profile.firstName}
+          {age != null ? `, ${age}` : ''}
+        </AppText>
         {profile.location ? (
-          <AppText variant="body" align="center">
-            {placeLabel(profile.location)}
-          </AppText>
-        ) : null}
-        {record?.birthDate ? (
-          <AppText variant="caption" color="textMuted">
-            Age only · birthday stays private
-          </AppText>
+          <View style={styles.locationRow}>
+            <MapPin size={14} color={colors.textMuted} />
+            <AppText variant="body" color="textMuted">
+              {placeLabel(profile.location)}
+            </AppText>
+          </View>
         ) : null}
         {paused ? (
           <View style={styles.pauseBadge}>
             <PauseCircle size={14} color={colors.plum} />
             <AppText variant="label" color="plum">
-              Profile paused
+              Hidden from Discover
             </AppText>
           </View>
         ) : null}
       </View>
 
-      <View style={styles.completeness}>
+      <View style={styles.card}>
         <View style={styles.completenessRow}>
-          <AppText variant="bodyStrong">Profile strength</AppText>
+          <AppText variant="bodyStrong">Complete your profile</AppText>
           <AppText variant="label" color="plum">
-            {percent}%
+            {done}/{total}
           </AppText>
         </View>
         <View style={styles.barTrack}>
           <View style={[styles.barFill, { width: `${percent}%` }]} />
         </View>
         <AppText variant="caption" color="textMuted">
-          {done} of {total} sections filled — stronger profiles get more likes.
+          Profiles with a video intro and full bio get more likes.
         </AppText>
+        <Button title="Edit profile" onPress={() => router.push('/(app)/edit-profile')} style={styles.editBtn} />
       </View>
 
       <View style={styles.section}>
-        <AppText variant="label">I’m here to</AppText>
+        <AppText variant="label" color="textMuted">
+          I’m here to
+        </AppText>
         <View style={styles.tiles}>
           {MODES.map((option) => (
             <SelectTile
@@ -141,55 +170,85 @@ export default function ProfileScreen() {
             />
           ))}
         </View>
-        <AppText variant="caption" color="textMuted">
-          You’ll only see people in the same mode.
-        </AppText>
       </View>
 
-      <View style={styles.menu}>
-        <Row
-          icon={<Pencil size={18} color={colors.plum} />}
-          title="Edit profile"
-          subtitle="Bio, prompts, interests and more"
-          onPress={() => router.push('/(app)/edit-profile')}
-        />
-        <Row
+      <View style={styles.card}>
+        <MenuRow
           icon={<Eye size={18} color={colors.plum} />}
           title="Preview"
-          subtitle="See how others see you"
+          subtitle="See how you appear on Discover"
           onPress={() => router.push('/(app)/preview-profile')}
         />
-        <Row
+        <MenuRow
+          icon={<Pencil size={18} color={colors.plum} />}
+          title="Edit profile"
+          subtitle="Photos, bio, prompts, interests"
+          onPress={() => router.push('/(app)/edit-profile')}
+        />
+        <MenuRow
           icon={<PauseCircle size={18} color={colors.plum} />}
-          title={paused ? 'Resume profile' : 'Pause profile'}
-          subtitle={paused ? 'You’re hidden from Discover' : 'Hide from Discover, keep matches'}
+          title={paused ? 'Resume my profile' : 'Pause my profile'}
+          subtitle={paused ? 'Show me on Discover again' : 'Hide from Discover · keep matches'}
           onPress={togglePause}
         />
-        <Row
+        <MenuRow
           icon={<Settings size={18} color={colors.plum} />}
           title="Settings"
           subtitle="Privacy, blocked users, account"
           onPress={() => router.push('/(app)/settings')}
         />
+        <MenuRow
+          icon={<MapPin size={18} color={colors.plum} />}
+          title="Update location"
+          subtitle={profile.location ? placeLabel(profile.location) : 'Add where you are'}
+          onPress={updateLocation}
+        />
       </View>
 
-      <Button title="Update location" variant="secondary" onPress={updateLocation} loading={updatingLocation} />
       <Button title="Sign out" variant="secondary" onPress={signOut} />
+      {updatingLocation ? (
+        <AppText variant="caption" color="textMuted" align="center">
+          Updating location…
+        </AppText>
+      ) : null}
     </TabScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
+  hero: {
     alignItems: 'center',
     gap: spacing.xs,
   },
-  photo: {
-    width: 140,
-    height: 140,
-    borderRadius: radii.lg,
-    backgroundColor: colors.pinkTint,
+  photoWrap: {
     marginBottom: spacing.sm,
+  },
+  photo: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    backgroundColor: colors.pinkTint,
+    borderWidth: 3,
+    borderColor: colors.pink,
+  },
+  photoEmpty: {
+    borderColor: colors.pinkBorder,
+  },
+  percentBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: 6,
+    minWidth: 40,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+    backgroundColor: colors.plum,
+    alignItems: 'center',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   pauseBadge: {
     flexDirection: 'row',
@@ -201,8 +260,14 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.pinkTint,
   },
-  completeness: {
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.pinkBorder,
+    padding: spacing.md,
     gap: spacing.xs,
+    ...shadows.card,
   },
   completenessRow: {
     flexDirection: 'row',
@@ -214,11 +279,15 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: colors.pinkTint,
     overflow: 'hidden',
+    marginVertical: spacing.xxs,
   },
   barFill: {
     height: '100%',
     backgroundColor: colors.plum,
     borderRadius: 4,
+  },
+  editBtn: {
+    marginTop: spacing.sm,
   },
   section: {
     gap: spacing.sm,
@@ -227,19 +296,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.xs,
   },
-  menu: {
-    gap: spacing.xs,
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.md,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.pinkBorder,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.pinkBorder,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   rowIcon: {
     width: 36,

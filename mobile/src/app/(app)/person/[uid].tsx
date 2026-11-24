@@ -110,6 +110,9 @@ export default function PersonScreen() {
       </SafeAreaView>
 
       <SafeAreaView edges={['bottom']} style={styles.actions}>
+        <AppText variant="caption" color="textMuted" align="center" style={styles.actionHint}>
+          Like means you like {card.firstName}’s profile
+        </AppText>
         <SwipeActions name={card.firstName} onAction={act} />
       </SafeAreaView>
     </View>
@@ -227,6 +230,10 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingVertical: spacing.md,
+    gap: spacing.xs,
     backgroundColor: 'rgba(255,255,255,0.92)',
+  },
+  actionHint: {
+    paddingHorizontal: layout.screenPadding,
   },
 });

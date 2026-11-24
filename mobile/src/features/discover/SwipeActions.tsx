@@ -18,14 +18,14 @@ export function SwipeActions({ onAction, disabled = false, name = '' }: SwipeAct
     <View style={styles.row}>
       <ActionButton
         label="Pass"
-        a11y={`Pass on ${name}`}
+        a11y={`Pass on ${name}’s profile`}
         onPress={() => onAction('pass')}
         disabled={disabled}
         icon={<X size={26} color={colors.plum} strokeWidth={2.5} />}
       />
       <ActionButton
         label="Like"
-        a11y={`Like ${name}`}
+        a11y={`Like ${name}’s profile`}
         onPress={() => onAction('like')}
         disabled={disabled}
         primary
@@ -33,7 +33,7 @@ export function SwipeActions({ onAction, disabled = false, name = '' }: SwipeAct
       />
       <ActionButton
         label="Save"
-        a11y={`Save ${name} for later`}
+        a11y={`Save ${name}’s profile for later`}
         onPress={() => onAction('save')}
         disabled={disabled}
         icon={<Bookmark size={24} color={colors.plum} strokeWidth={2.2} />}
