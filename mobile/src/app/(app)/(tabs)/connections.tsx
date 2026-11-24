@@ -64,11 +64,21 @@ export default function ConnectionsScreen() {
             accessibilityLabel={`${other?.firstName ?? 'Match'}. ${stageLine(match, uid)}${unread ? `. ${unread} new` : ''}`}
             onPress={() => router.push({ pathname: '/chat/[matchId]', params: { matchId: match.id } })}
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-            {other?.photoUrl ? (
-              <Image source={{ uri: other.photoUrl }} style={styles.avatar} contentFit="cover" />
-            ) : (
-              <View style={styles.avatar} />
-            )}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`View ${other?.firstName ?? 'match'}’s profile`}
+              onPress={() =>
+                otherId
+                  ? router.push({ pathname: '/person/[uid]', params: { uid: otherId, matchId: match.id } })
+                  : undefined
+              }
+              hitSlop={4}>
+              {other?.photoUrl ? (
+                <Image source={{ uri: other.photoUrl }} style={styles.avatar} contentFit="cover" />
+              ) : (
+                <View style={styles.avatar} />
+              )}
+            </Pressable>
             <View style={styles.text}>
               <AppText variant="bodyStrong">{other?.firstName ?? 'Match'}</AppText>
               <AppText variant="caption" color={yourTurn || unread ? 'plum' : 'textMuted'} numberOfLines={1}>

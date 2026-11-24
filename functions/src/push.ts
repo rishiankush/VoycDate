@@ -4,7 +4,13 @@ import { logger } from 'firebase-functions';
 
 import { db } from './shared';
 
-export type NotificationKind = 'newMatch' | 'voiceMessage' | 'textPhoto' | 'unlock' | 'expiry';
+export type NotificationKind =
+  | 'newMatch'
+  | 'voiceMessage'
+  | 'textPhoto'
+  | 'unlock'
+  | 'expiry'
+  | 'verification';
 
 export type PushPayload = {
   title: string;
@@ -21,6 +27,7 @@ const DEFAULT_SETTINGS: Record<NotificationKind, boolean> = {
   textPhoto: true,
   unlock: true,
   expiry: true,
+  verification: true,
 };
 
 function settingsOf(user: FirebaseFirestore.DocumentData | undefined, prefs: FirebaseFirestore.DocumentData | undefined) {

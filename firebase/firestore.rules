@@ -60,10 +60,12 @@ service cloud.firestore {
 
       allow create: if isOwner(userId)
         && clientVideoIntro(request.resource.data.get('videoIntro', null))
-        && !('moderation' in request.resource.data);
+        && !('moderation' in request.resource.data)
+        && !('verification' in request.resource.data);
 
       allow update: if isOwner(userId)
         && unchanged('moderation')
+        && unchanged('verification')
         && (unchanged('videoIntro') || clientVideoIntro(request.resource.data.get('videoIntro', null)));
     }
 
@@ -76,8 +78,25 @@ service cloud.firestore {
       allow read: if isOwner(userId);
     }
 
-    // Written only by Cloud Functions; admins review in a later milestone.
+    // Written only by Cloud Functions; admins use callables.
     match /reports/{reportId} {
+      allow read, write: if false;
+    }
+
+    match /verifications/{requestId} {
+      allow read, write: if false;
+    }
+
+    match /verificationChallenges/{userId} {
+      allow read, write: if false;
+    }
+
+    match /admins/{adminId} {
+      allow read: if isOwner(adminId);
+      allow write: if false;
+    }
+
+    match /config/{docId} {
       allow read, write: if false;
     }
 

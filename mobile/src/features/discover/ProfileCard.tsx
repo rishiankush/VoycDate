@@ -75,11 +75,8 @@ export function ProfileCard({
   useEffect(() => setMuted(player, muted), [player, muted]);
   useEffect(() => syncPlayback(player, active && !behind), [player, active, behind]);
 
-  useEffect(() => {
-    if (!active || !video) return;
-    const timer = setTimeout(() => setShowCover(false), 700);
-    return () => clearTimeout(timer);
-  }, [active, video, card.uid]);
+  // Keep poster until the first decoded frame — avoids a black flash on slow networks.
+  // No timed hide: that would uncover the player before it's ready and waste a blank paint.
 
   const commit = (action: SwipeAction) => {
     onAction(action);
@@ -294,7 +291,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(8, 52, 63, 0.45)',
+    backgroundColor: 'rgba(42, 11, 43, 0.45)',
   },
   info: {
     position: 'absolute',

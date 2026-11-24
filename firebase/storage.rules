@@ -45,6 +45,14 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    // Verification videos: owner uploads only; admins read via signed URLs from Cloud Functions.
+    match /verifications/{userId}/{fileName} {
+      allow read, delete: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && request.resource.size < 20 * 1024 * 1024
+        && request.resource.contentType.matches('video/.*');
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

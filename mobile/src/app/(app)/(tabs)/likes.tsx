@@ -1,41 +1,104 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { BlurView } from 'expo-blur';
-import { Heart, Bookmark } from 'lucide-react-native';
+import { Heart, Bookmark, X } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
-import { AppText, Button } from '@/components/ui';
+import { AppText, Button, PinkGradient } from '@/components/ui';
 import { useDiscovery } from '@/features/discover/DiscoveryProvider';
+import type { DiscoverCard, SwipeAction } from '@/features/discover/types';
 import { EmptyCard, TabScreen } from '@/features/navigation/TabScreen';
 import { fetchLikesTab, type LikeTile, type LikesTabData } from '@/features/premium/premium';
-import { colors, radii, spacing } from '@/theme';
+import { colors, radii, shadows, spacing } from '@/theme';
+
+function toCard(person: LikeTile): DiscoverCard {
+  return {
+    uid: person.uid,
+    firstName: person.firstName,
+    age: person.age,
+    distanceKm: null,
+    gender: null,
+    intent: null,
+    heightCm: null,
+    interests: [],
+    values: [],
+    habits: {},
+    family: {},
+    beliefs: {},
+    photos: person.photoUrl ? [{ url: person.photoUrl, width: 0, height: 0 }] : [],
+    video: null,
+    prompts: [],
+    bio: '',
+    city: person.city ?? '',
+    region: null,
+    countryCode: null,
+    verified: false,
+  };
+}
 
 function Tile({
   person,
-  onPress,
-  cta,
+  premium,
+  busy,
+  onReveal,
+  onAction,
 }: {
   person: LikeTile;
-  onPress: () => void;
-  cta?: string;
+  premium: boolean;
+  busy: boolean;
+  onReveal: () => void;
+  onAction: (action: 'like' | 'pass') => void;
 }) {
+  // Premium: Pass + Like on the photo. Free liked-you stays Reveal → paywall.
+  const showPremiumActions = premium && !person.blurred;
+
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.tile}>
-      <View style={styles.photoWrap}>
+    <View style={styles.tile}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          person.blurred
+            ? `Reveal ${person.firstName}`
+            : `${person.firstName}${person.age != null ? `, ${person.age}` : ''}`
+        }
+        disabled={showPremiumActions}
+        onPress={person.blurred ? onReveal : undefined}
+        style={styles.photoWrap}>
         {person.photoUrl ? (
           <Image source={{ uri: person.photoUrl }} style={styles.photo} contentFit="cover" />
         ) : (
           <View style={[styles.photo, styles.photoEmpty]} />
         )}
         {person.blurred ? (
-          <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill}>
-            <View style={styles.blurOverlay}>
-              <Heart size={22} color={colors.white} fill={colors.pink} />
+          <>
+            <BlurView intensity={72} tint="light" style={StyleSheet.absoluteFill} />
+            <View style={styles.blurOverlay} pointerEvents="none">
+              <Heart size={22} color={colors.plum} fill={colors.pink} />
             </View>
-          </BlurView>
+          </>
         ) : null}
-      </View>
+        {showPremiumActions ? (
+          <View style={styles.actions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Pass on ${person.firstName}`}
+              disabled={busy}
+              onPress={() => onAction('pass')}
+              style={({ pressed }) => [styles.actionBtn, styles.passBtn, pressed && styles.actionPressed, busy && styles.actionBusy]}>
+              <X size={18} color={colors.plum} strokeWidth={2.5} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Like ${person.firstName}`}
+              disabled={busy}
+              onPress={() => onAction('like')}
+              style={({ pressed }) => [styles.actionBtn, styles.likeBtn, pressed && styles.actionPressed, busy && styles.actionBusy]}>
+              <Heart size={18} color={colors.white} fill={colors.white} />
+            </Pressable>
+          </View>
+        ) : null}
+      </Pressable>
       <AppText variant="bodyStrong" numberOfLines={1}>
         {person.firstName}
         {person.age != null ? `, ${person.age}` : ''}
@@ -45,12 +108,21 @@ function Tile({
           {person.city}
         </AppText>
       ) : null}
-      {cta ? (
-        <AppText variant="label" color="plum" style={styles.cta}>
-          {cta}
-        </AppText>
+      {person.blurred ? (
+        <Pressable onPress={onReveal} hitSlop={6}>
+          <AppText variant="label" color="plum" style={styles.cta}>
+            Reveal
+          </AppText>
+        </Pressable>
       ) : null}
-    </Pressable>
+      {!premium && !person.blurred ? (
+        <Pressable onPress={() => onAction('like')} disabled={busy} hitSlop={6}>
+          <AppText variant="label" color="plum" style={styles.cta}>
+            {busy ? '…' : 'Like'}
+          </AppText>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -78,43 +150,31 @@ export default function LikesScreen() {
     }, [load]),
   );
 
-  const likeBack = async (person: LikeTile) => {
+  const act = (person: LikeTile, action: SwipeAction, list: 'likedYou' | 'saved') => {
     if (person.blurred) {
       router.push('/(app)/paywall');
       return;
     }
-    setBusyId(person.uid);
-    try {
-      // DiscoveryProvider.swipe expects a DiscoverCard; for like-back we call swipe callable via a minimal card.
-      swipe(
-        {
-          uid: person.uid,
-          firstName: person.firstName,
-          age: person.age,
-          distanceKm: null,
-          gender: null,
-          intent: null,
-          heightCm: null,
-          interests: [],
-          values: [],
-          habits: {},
-          family: {},
-          beliefs: {},
-          photos: person.photoUrl ? [{ url: person.photoUrl, width: 0, height: 0 }] : [],
-          video: null,
-          prompts: [],
-          bio: '',
-          city: person.city ?? '',
-          region: null,
-          countryCode: null,
-          verified: false,
-        },
-        'like',
-      );
-      await load();
-    } finally {
-      setBusyId(null);
+    // Pass on Liked you / Saved actions that need a clear profile are Premium-only.
+    if (action === 'pass' && !data?.premium) {
+      router.push('/(app)/paywall');
+      return;
     }
+    if (busyId) return;
+    setBusyId(person.uid);
+    // Optimistic remove so the grid feels instant.
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            likedYouCount: list === 'likedYou' ? Math.max(0, prev.likedYouCount - 1) : prev.likedYouCount,
+            likedYou: list === 'likedYou' ? prev.likedYou.filter((p) => p.uid !== person.uid) : prev.likedYou,
+            saved: list === 'saved' ? prev.saved.filter((p) => p.uid !== person.uid) : prev.saved,
+          }
+        : prev,
+    );
+    swipe(toCard(person), action);
+    setBusyId(null);
   };
 
   if (loading && !data) {
@@ -133,7 +193,7 @@ export default function LikesScreen() {
   return (
     <TabScreen title="Likes">
       {!premium ? (
-        <View style={styles.banner}>
+        <PinkGradient variant="banner" style={styles.banner}>
           <AppText variant="bodyStrong" color="plum">
             {data?.likedYouCount
               ? `${data.likedYouCount} ${data.likedYouCount === 1 ? 'person likes' : 'people like'} you`
@@ -144,7 +204,7 @@ export default function LikesScreen() {
             {remaining != null ? ` · ${remaining} likes left today` : ''}.
           </AppText>
           <Button title="Upgrade" onPress={() => router.push('/(app)/paywall')} style={styles.bannerBtn} />
-        </View>
+        </PinkGradient>
       ) : remaining == null ? (
         <AppText variant="caption" color="textMuted">
           Premium · unlimited likes
@@ -166,8 +226,10 @@ export default function LikesScreen() {
             <Tile
               key={person.uid}
               person={person}
-              cta={person.blurred ? 'Reveal' : busyId === person.uid ? '…' : 'Like back'}
-              onPress={() => likeBack(person)}
+              premium={premium}
+              busy={busyId === person.uid}
+              onReveal={() => router.push('/(app)/paywall')}
+              onAction={(action) => act(person, action, 'likedYou')}
             />
           ))}
         </View>
@@ -188,8 +250,10 @@ export default function LikesScreen() {
             <Tile
               key={person.uid}
               person={person}
-              cta={busyId === person.uid ? '…' : 'Like'}
-              onPress={() => likeBack(person)}
+              premium={premium}
+              busy={busyId === person.uid}
+              onReveal={() => router.push('/(app)/paywall')}
+              onAction={(action) => act(person, action, 'saved')}
             />
           ))}
         </View>
@@ -203,7 +267,6 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     padding: spacing.md,
     borderRadius: radii.md,
-    backgroundColor: colors.pinkTint,
     borderWidth: 1,
     borderColor: colors.pinkBorder,
   },
@@ -232,13 +295,42 @@ const styles = StyleSheet.create({
     aspectRatio: 0.75,
   },
   photoEmpty: {
-    backgroundColor: colors.plum,
+    backgroundColor: colors.pinkSoft,
   },
   blurOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(8,52,63,0.25)',
+    backgroundColor: 'rgba(247, 234, 245, 0.28)',
+  },
+  actions: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  actionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.card,
+  },
+  passBtn: {
+    backgroundColor: colors.white,
+  },
+  likeBtn: {
+    backgroundColor: colors.plum,
+  },
+  actionPressed: {
+    transform: [{ scale: 0.94 }],
+  },
+  actionBusy: {
+    opacity: 0.5,
   },
   cta: {
     marginTop: 2,

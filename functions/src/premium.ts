@@ -55,22 +55,25 @@ export const getLikesTab = onCall(async (request) => {
   const discoveryById = new Map(discoverySnaps.map((snap, i) => [discoveryIds[i], snap.data()]));
 
   const likedYou = likerIds.map((id) => {
-    const card = discoveryById.get(id)?.card;
+    const doc = discoveryById.get(id);
+    const card = doc?.card;
+    const photoUrl = card?.photos?.[0]?.url ?? card?.video?.posterUrl ?? null;
+    // Free users still get a photo URL so the client can show a real blur (not a solid block).
     if (!premium) {
       return {
         uid: id,
         firstName: card?.firstName ? `${String(card.firstName).slice(0, 1)}.` : 'Someone',
-        photoUrl: null,
+        photoUrl,
         blurred: true,
         city: null,
         age: null,
       };
     }
-    const birthDate = discoveryById.get(id)?.birthDate as string | undefined;
+    const birthDate = doc?.birthDate as string | undefined;
     return {
       uid: id,
       firstName: card?.firstName ?? 'Someone',
-      photoUrl: card?.photos?.[0]?.url ?? card?.video?.posterUrl ?? null,
+      photoUrl,
       blurred: false,
       city: card?.city ?? null,
       age: birthDate ? ageFromBirthDate(birthDate) : null,
@@ -78,8 +81,9 @@ export const getLikesTab = onCall(async (request) => {
   });
 
   const saved = savedIds.map((id) => {
-    const card = discoveryById.get(id)?.card;
-    const birthDate = discoveryById.get(id)?.birthDate as string | undefined;
+    const doc = discoveryById.get(id);
+    const card = doc?.card;
+    const birthDate = doc?.birthDate as string | undefined;
     return {
       uid: id,
       firstName: card?.firstName ?? 'Someone',

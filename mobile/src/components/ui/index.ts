@@ -3,6 +3,7 @@ export { Button } from './Button';
 export { Chip } from './Chip';
 export { ChipGroup } from './ChipGroup';
 export { GlowBackground } from './GlowBackground';
+export { PinkGradient } from './PinkGradient';
 export { IconButton } from './IconButton';
 export { OptionCard } from './OptionCard';
 export { Screen } from './Screen';

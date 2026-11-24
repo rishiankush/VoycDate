@@ -29,3 +29,17 @@ export { transcribeVoiceMessage } from './transcription';
 export { unmatch, blockUser, unblockUser, reportUser, listBlockedUsers } from './safety';
 export { requestDataExport, deleteAccount } from './account';
 export { getLikesTab, setPremiumStatus } from './premium';
+export { getMatchProfile } from './profiles';
+export { prepareVerification, submitVerification } from './verification';
+export {
+  adminGetOverview,
+  adminGetSettings,
+  adminUpdateSettings,
+  adminListVerifications,
+  adminDecideVerification,
+  adminListReports,
+  adminResolveReport,
+  adminSearchUsers,
+  adminSetUserStatus,
+  adminRevokeVerification,
+} from './admin';

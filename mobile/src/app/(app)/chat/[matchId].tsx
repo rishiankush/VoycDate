@@ -159,6 +159,11 @@ export default function ChatScreen() {
   const canRecord = match.status === 'active' && !expired && !waitingForThem;
   const helper = helperText(match, uid, otherId, other.firstName);
 
+  const openProfile = () => {
+    if (!otherId || !matchId) return;
+    router.push({ pathname: '/person/[uid]', params: { uid: otherId, matchId } });
+  };
+
   const sendDraft = async () => {
     const value = draft;
     setDraft('');
@@ -172,19 +177,34 @@ export default function ChatScreen() {
         <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
           <View style={styles.header}>
             <IconButton accessibilityLabel="Back" onPress={router.back} icon={<ChevronLeft size={22} color={colors.plum} />} />
-            {other.photoUrl ? (
-              <Image source={{ uri: other.photoUrl }} style={styles.avatar} contentFit="cover" />
-            ) : (
-              <View style={styles.avatar} />
-            )}
-            <View style={styles.headerText}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`View ${other.firstName}’s profile`}
+              onPress={openProfile}
+              hitSlop={8}>
+              {other.photoUrl ? (
+                <Image source={{ uri: other.photoUrl }} style={styles.avatar} contentFit="cover" />
+              ) : (
+                <View style={styles.avatar} />
+              )}
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`View ${other.firstName}’s profile`}
+              onPress={openProfile}
+              style={styles.headerText}>
               <AppText variant="bodyStrong" style={styles.name}>
                 {other.firstName}
               </AppText>
               <AppText variant="caption">{matchedLabel(match, new Date(now))}</AppText>
-            </View>
+            </Pressable>
             {match.status === 'active' ? (
-              <SafetyActions targetId={otherId} targetName={other.firstName} matchId={matchId} canUnmatch>
+              <SafetyActions
+                targetId={otherId}
+                targetName={other.firstName}
+                matchId={matchId}
+                canUnmatch
+                onViewProfile={openProfile}>
                 {(open) => (
                   <IconButton
                     accessibilityLabel="Conversation options"

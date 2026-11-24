@@ -1,8 +1,7 @@
 import { Image } from 'expo-image';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { router } from 'expo-router';
 import { X } from 'lucide-react-native';
-import { useEffect, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -14,6 +13,7 @@ import { placeLabel } from '@/features/location/deviceLocation';
 import { formatHeight } from '@/features/onboarding/units';
 import { ageFromBirthDate } from '@/features/profile/age';
 import { useMyProfile } from '@/features/profile/MyProfileProvider';
+import { VideoCover } from '@/features/video/VideoCover';
 import { colors, layout, radii, shadows, spacing } from '@/theme';
 
 function Block({ title, children }: { title: string; children: ReactNode }) {
@@ -44,18 +44,6 @@ function Tags({ title, items, highlight }: { title: string; items: string[]; hig
       </View>
     </View>
   );
-}
-
-function PreviewVideo({ url }: { url: string }) {
-  const player = useVideoPlayer(url, (p) => {
-    p.loop = true;
-    p.muted = true;
-    p.play();
-  });
-  useEffect(() => {
-    player.play();
-  }, [player]);
-  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />;
 }
 
 export default function PreviewProfileScreen() {
@@ -93,7 +81,13 @@ export default function PreviewProfileScreen() {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
-            {hasVideo ? <PreviewVideo url={profile.videoIntro!.url} /> : null}
+            {hasVideo ? (
+              <VideoCover
+                url={profile.videoIntro!.url!}
+                posterUrl={profile.videoIntro?.posterUrl ?? photo?.url ?? null}
+                style={StyleSheet.absoluteFill}
+              />
+            ) : null}
             {!hasVideo && photo ? <Image source={{ uri: photo.url }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
             {!hasVideo && !photo ? <View style={[StyleSheet.absoluteFill, styles.heroEmpty]} /> : null}
             <PhotoGradient />

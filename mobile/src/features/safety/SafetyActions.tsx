@@ -13,10 +13,19 @@ type SafetyActionsProps = {
   matchId?: string;
   /** When true, include Unmatch (chat / matched context). */
   canUnmatch?: boolean;
+  /** Opens the other person’s profile (chat / match context). */
+  onViewProfile?: () => void;
   children: (open: () => void) => ReactNode;
 };
 
-export function SafetyActions({ targetId, targetName, matchId, canUnmatch = false, children }: SafetyActionsProps) {
+export function SafetyActions({
+  targetId,
+  targetName,
+  matchId,
+  canUnmatch = false,
+  onViewProfile,
+  children,
+}: SafetyActionsProps) {
   const [reporting, setReporting] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -91,6 +100,7 @@ export function SafetyActions({ targetId, targetName, matchId, canUnmatch = fals
   const open = () => {
     if (busy) return;
     const options = [
+      ...(onViewProfile ? (['View profile'] as const) : []),
       ...(canUnmatch && matchId ? (['Unmatch'] as const) : []),
       'Block',
       'Report',
@@ -104,7 +114,8 @@ export function SafetyActions({ targetId, targetName, matchId, canUnmatch = fals
         { options, cancelButtonIndex, destructiveButtonIndex, userInterfaceStyle: 'light' },
         (index) => {
           const label = options[index];
-          if (label === 'Unmatch') doUnmatch();
+          if (label === 'View profile') onViewProfile?.();
+          else if (label === 'Unmatch') doUnmatch();
           else if (label === 'Block') doBlock();
           else if (label === 'Report') setReporting(true);
         },
@@ -116,6 +127,7 @@ export function SafetyActions({ targetId, targetName, matchId, canUnmatch = fals
       targetName,
       undefined,
       [
+        ...(onViewProfile ? [{ text: 'View profile', onPress: onViewProfile }] : []),
         ...(canUnmatch && matchId
           ? [{ text: 'Unmatch', style: 'destructive' as const, onPress: doUnmatch }]
           : []),

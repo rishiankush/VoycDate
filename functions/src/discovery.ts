@@ -129,7 +129,12 @@ export const getDiscoveryFeed = onCall(async (request) => {
       });
     }
   }
-  candidates.sort((a, b) => (a.distanceKm ?? Number.POSITIVE_INFINITY) - (b.distanceKm ?? Number.POSITIVE_INFINITY));
+  // Verified profiles rank above others; then nearer first.
+  candidates.sort((a, b) => {
+    const verifiedDelta = Number(Boolean(b.verified)) - Number(Boolean(a.verified));
+    if (verifiedDelta) return verifiedDelta;
+    return (a.distanceKm ?? Number.POSITIVE_INFINITY) - (b.distanceKm ?? Number.POSITIVE_INFINITY);
+  });
 
   // Check earlier swipes only for the shortlist, instead of reading the user's whole swipe history.
   const cards: (typeof candidates)[number][] = [];

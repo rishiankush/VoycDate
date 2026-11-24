@@ -1,5 +1,8 @@
 .DS_Store
 
+# Dependencies
+node_modules/
+
 # Firebase
 .firebase/
 firebase-debug.log
@@ -11,9 +14,13 @@ pubsub-debug.log
 emulator-data/
 
 # Cloud Functions
-functions/node_modules/
 functions/lib/
 functions/.env.local
 functions/*.local
+
+# Admin dashboard
+admin/dist/
+admin/.env
+admin/.env.local
 
 docs/

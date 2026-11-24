@@ -34,7 +34,7 @@ export async function registerPushToken(uid: string) {
       name: 'VOYC',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#0F4C5C',
+      lightColor: '#471448',
     });
   }
 

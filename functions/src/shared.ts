@@ -13,6 +13,14 @@ export function requireUid(request: CallableRequest) {
   return uid;
 }
 
+/** Admins are listed in `admins/{uid}` (seed with scripts/make-admin.mjs). */
+export async function requireAdmin(request: CallableRequest) {
+  const uid = requireUid(request);
+  const snap = await db().doc(`admins/${uid}`).get();
+  if (!snap.exists) throw new HttpsError('permission-denied', 'Admins only.');
+  return { uid, role: (snap.data()?.role as string) ?? 'admin' };
+}
+
 export function ageFromBirthDate(iso: string, today = new Date()) {
   const [year, month, day] = iso.split('-').map(Number);
   let age = today.getUTCFullYear() - year;

@@ -1,11 +1,11 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Check, Crown, Eye, PauseCircle, Settings } from 'lucide-react-native';
+import { BadgeCheck, Check, Crown, Eye, PauseCircle, Settings, ShieldCheck } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppText, Button, GlowBackground, IconButton } from '@/components/ui';
+import { AppText, Button, GlowBackground, IconButton, PinkGradient } from '@/components/ui';
 import { useSession } from '@/features/auth/SessionProvider';
 import { placeLabel } from '@/features/location/deviceLocation';
 import { ageFromBirthDate } from '@/features/profile/age';
@@ -28,6 +28,8 @@ export default function ProfileScreen() {
   const { percent } = profileCompleteness(profile);
   const age = record?.birthDate ? ageFromBirthDate(record.birthDate) : null;
   const isPremium = Boolean(record?.premium?.active);
+  const verification = profile.verification?.status ?? 'none';
+  const isVerified = verification === 'approved';
 
   const togglePause = async () => {
     setPausing(true);
@@ -78,6 +80,7 @@ export default function ProfileScreen() {
                   {profile.firstName}
                   {age != null ? `, ${age}` : ''}
                 </AppText>
+                {isVerified ? <BadgeCheck size={22} color={colors.plum} fill={colors.pink} /> : null}
               </View>
               {profile.location ? (
                 <AppText variant="caption" color="textMuted">
@@ -94,6 +97,25 @@ export default function ProfileScreen() {
               </Pressable>
             </View>
           </View>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/(app)/verify')}
+            style={styles.verifyRow}>
+            <ShieldCheck size={18} color={colors.plum} />
+            <View style={styles.verifyText}>
+              <AppText variant="bodyStrong">
+                {isVerified ? 'Verified' : verification === 'pending' ? 'Verification under review' : 'Get verified'}
+              </AppText>
+              <AppText variant="caption" color="textMuted">
+                {isVerified
+                  ? 'Your badge is live on Discover'
+                  : verification === 'pending'
+                    ? 'Usually within 24–48 hours'
+                    : 'Verified profiles get more visibility'}
+              </AppText>
+            </View>
+          </Pressable>
 
           {paused ? (
             <Pressable onPress={togglePause} style={styles.pauseBanner} disabled={pausing}>
@@ -131,10 +153,10 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.premiumCard}>
+          <PinkGradient variant="hero" style={styles.premiumCard}>
             <View style={styles.premiumBadge}>
               <AppText variant="label" color="white">
-                {isPremium ? 'PREMIUM' : 'PREMIUM'}
+                PREMIUM
               </AppText>
             </View>
             <AppText variant="bodyStrong" color="plum" style={styles.premiumCopy}>
@@ -147,7 +169,7 @@ export default function ProfileScreen() {
               onPress={() => router.push('/(app)/paywall')}
               style={styles.premiumCta}
             />
-          </View>
+          </PinkGradient>
 
           <View style={styles.compare}>
             <View style={styles.compareHead}>
@@ -236,6 +258,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
+  verifyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.white,
+    ...shadows.card,
+  },
+  verifyText: {
+    flex: 1,
+    gap: 2,
+  },
   completeBtn: {
     alignSelf: 'flex-start',
     marginTop: 2,
@@ -282,7 +317,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.lg,
     borderRadius: radii.lg,
-    backgroundColor: colors.pink,
   },
   premiumBadge: {
     alignSelf: 'flex-start',

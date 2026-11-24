@@ -33,6 +33,19 @@ const CALLABLES = [
   'deleteAccount',
   'getLikesTab',
   'setPremiumStatus',
+  'getMatchProfile',
+  'prepareVerification',
+  'submitVerification',
+  'adminGetOverview',
+  'adminGetSettings',
+  'adminUpdateSettings',
+  'adminListVerifications',
+  'adminDecideVerification',
+  'adminListReports',
+  'adminResolveReport',
+  'adminSearchUsers',
+  'adminSetUserStatus',
+  'adminRevokeVerification',
 ];
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 

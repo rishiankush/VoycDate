@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radii.pill,
-    backgroundColor: 'rgba(8,52,63,0.75)',
+    backgroundColor: 'rgba(42, 11, 43, 0.75)',
   },
   slotBadgeText: {
     fontSize: 11,

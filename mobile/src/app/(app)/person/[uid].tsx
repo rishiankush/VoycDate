@@ -1,9 +1,8 @@
 import { Image } from 'expo-image';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ellipsis, X } from 'lucide-react-native';
-import { useEffect, type ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, IconButton } from '@/components/ui';
@@ -12,7 +11,9 @@ import { intentLabel, nameAgeLine, placeLine } from '@/features/discover/labels'
 import { SwipeActions } from '@/features/discover/SwipeActions';
 import type { DiscoverCard, SwipeAction } from '@/features/discover/types';
 import { formatHeight } from '@/features/onboarding/units';
+import { fetchMatchProfile } from '@/features/premium/premium';
 import { SafetyActions } from '@/features/safety/SafetyActions';
+import { VideoCover } from '@/features/video/VideoCover';
 import { colors, layout, radii, spacing } from '@/theme';
 
 function basics(card: DiscoverCard) {
@@ -30,11 +31,45 @@ function basics(card: DiscoverCard) {
 }
 
 export default function PersonScreen() {
-  const { uid } = useLocalSearchParams<{ uid: string }>();
+  const { uid, matchId } = useLocalSearchParams<{ uid: string; matchId?: string }>();
   const { findCard, swipe } = useDiscovery();
-  const card = findCard(uid);
+  const fromMatch = Boolean(matchId);
+  const discoveryCard = fromMatch ? undefined : findCard(uid);
+  const [matchCard, setMatchCard] = useState<DiscoverCard | null>(null);
+  const [loadingMatch, setLoadingMatch] = useState(fromMatch);
+  const [loadError, setLoadError] = useState(false);
 
-  if (!card) {
+  useEffect(() => {
+    if (!fromMatch || !matchId || !uid) return;
+    let cancelled = false;
+    setLoadingMatch(true);
+    setLoadError(false);
+    fetchMatchProfile(matchId, uid)
+      .then((card) => {
+        if (!cancelled) setMatchCard(card);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingMatch(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fromMatch, matchId, uid]);
+
+  if (fromMatch && loadingMatch) {
+    return (
+      <SafeAreaView style={styles.missing}>
+        <ActivityIndicator color={colors.plum} />
+      </SafeAreaView>
+    );
+  }
+
+  const card = fromMatch ? matchCard : discoveryCard;
+
+  if (!card || loadError) {
     return (
       <SafeAreaView style={styles.missing}>
         <AppText variant="bodyLarge">This profile is no longer available.</AppText>
@@ -53,8 +88,16 @@ export default function PersonScreen() {
 
   return (
     <View style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {card.video ? <ProfileVideo url={card.video.url} /> : null}
+      <ScrollView
+        contentContainerStyle={[styles.content, fromMatch && styles.contentMatch]}
+        showsVerticalScrollIndicator={false}>
+        {card.video ? (
+          <VideoCover
+            url={card.video.url}
+            posterUrl={card.video.posterUrl ?? photos[0]?.url ?? null}
+            style={styles.hero}
+          />
+        ) : null}
         {!card.video && photos[0] ? <Image source={{ uri: photos[0].url }} style={styles.hero} contentFit="cover" /> : null}
 
         <View style={styles.section}>
@@ -97,10 +140,14 @@ export default function PersonScreen() {
       </ScrollView>
 
       <SafeAreaView edges={['top']} style={styles.topBar} pointerEvents="box-none">
-        <SafetyActions targetId={card.uid} targetName={card.firstName}>
+        <SafetyActions
+          targetId={card.uid}
+          targetName={card.firstName}
+          matchId={matchId}
+          canUnmatch={fromMatch}>
           {(open) => (
             <IconButton
-              accessibilityLabel="Report or block"
+              accessibilityLabel="More options"
               onPress={open}
               icon={<Ellipsis size={20} color={colors.plum} />}
             />
@@ -109,29 +156,14 @@ export default function PersonScreen() {
         <IconButton accessibilityLabel="Close" onPress={router.back} icon={<X size={20} color={colors.plum} />} />
       </SafeAreaView>
 
-      <SafeAreaView edges={['bottom']} style={styles.actions}>
-        <AppText variant="caption" color="textMuted" align="center" style={styles.actionHint}>
-          Like means you like {card.firstName}’s profile
-        </AppText>
-        <SwipeActions name={card.firstName} onAction={act} />
-      </SafeAreaView>
-    </View>
-  );
-}
-
-function ProfileVideo({ url }: { url: string }) {
-  const player = useVideoPlayer(url, (p) => {
-    p.loop = true;
-    p.muted = true;
-    p.play();
-  });
-  useEffect(() => {
-    player.play();
-  }, [player]);
-
-  return (
-    <View style={styles.hero}>
-      <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+      {!fromMatch ? (
+        <SafeAreaView edges={['bottom']} style={styles.actions}>
+          <AppText variant="caption" color="textMuted" align="center" style={styles.actionHint}>
+            Like means you like {card.firstName}’s profile
+          </AppText>
+          <SwipeActions name={card.firstName} onAction={act} />
+        </SafeAreaView>
+      ) : null}
     </View>
   );
 }
@@ -180,10 +212,13 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 140,
   },
+  contentMatch: {
+    paddingBottom: spacing.xxl,
+  },
   hero: {
     width: '100%',
     aspectRatio: 0.75,
-    backgroundColor: colors.plumDeep,
+    backgroundColor: colors.pinkTint,
     overflow: 'hidden',
   },
   section: {

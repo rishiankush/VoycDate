@@ -61,6 +61,12 @@ export type Profile = {
   location?: ProfileLocation;
   /** Written by the moderation function only. */
   moderation?: { lastRejection?: { reason: string; at: { toMillis(): number } | null } };
+  /** Written by verification Cloud Functions only. */
+  verification?: {
+    status?: 'none' | 'pending' | 'approved' | 'rejected';
+    requestId?: string;
+    rejectionReason?: string | null;
+  };
 };
 
 export type NotificationPrefs = {

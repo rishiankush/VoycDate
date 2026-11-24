@@ -30,7 +30,7 @@ export function publicCard(profile: DocumentData) {
     city: profile.location?.city ?? '',
     region: profile.location?.region ?? null,
     countryCode: profile.location?.countryCode ?? null,
-    verified: false,
+    verified: profile.verification?.status === 'approved',
   };
 }
 

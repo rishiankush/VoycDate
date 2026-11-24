@@ -3,7 +3,7 @@ import { Check, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
-import { AppText, Button, IconButton, Screen } from '@/components/ui';
+import { AppText, Button, IconButton, PinkGradient, Screen } from '@/components/ui';
 import { useSession } from '@/features/auth/SessionProvider';
 import { PLANS, setPremiumStatus } from '@/features/premium/premium';
 import { colors, radii, spacing } from '@/theme';
@@ -66,7 +66,7 @@ export default function PaywallScreen() {
           />
         )
       }>
-      <View style={styles.hero}>
+      <PinkGradient variant="hero" style={styles.hero}>
         <View style={styles.badge}>
           <AppText variant="label" color="white">
             VOYC PREMIUM
@@ -78,7 +78,7 @@ export default function PaywallScreen() {
         <AppText variant="body" color="text">
           Better ways to connect — see who’s interested and like without daily limits.
         </AppText>
-      </View>
+      </PinkGradient>
 
       {!isPremium ? (
         <View style={styles.plans}>
@@ -149,7 +149,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.lg,
     borderRadius: radii.lg,
-    backgroundColor: colors.pink,
     marginBottom: spacing.lg,
   },
   badge: {

@@ -10,21 +10,27 @@ export function GlowBackground({ variant = 'light' }: { variant?: GlowVariant })
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Svg width="100%" height="100%">
         <Defs>
+          <LinearGradient id="lightBase" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.pinkGlow} />
+            <Stop offset="0.28" stopColor={colors.white} />
+            <Stop offset="0.72" stopColor={colors.white} />
+            <Stop offset="1" stopColor={colors.pinkTint} />
+          </LinearGradient>
           <LinearGradient id="darkBase" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={colors.plumGradientTop} />
             <Stop offset="0.55" stopColor={colors.plum} />
             <Stop offset="1" stopColor={colors.plumDeep} />
           </LinearGradient>
           <RadialGradient id="glowTopRight" cx="100%" cy="0%" r="65%">
-            <Stop offset="0" stopColor={variant === 'light' ? colors.pinkGlow : colors.plumGlow} stopOpacity={0.95} />
-            <Stop offset="1" stopColor={variant === 'light' ? colors.pinkGlow : colors.plumGlow} stopOpacity={0} />
+            <Stop offset="0" stopColor={variant === 'light' ? colors.pinkSoft : colors.plumGlow} stopOpacity={0.55} />
+            <Stop offset="1" stopColor={variant === 'light' ? colors.pinkSoft : colors.plumGlow} stopOpacity={0} />
           </RadialGradient>
           <RadialGradient id="glowBottomLeft" cx="0%" cy="78%" r="45%">
-            <Stop offset="0" stopColor={variant === 'light' ? colors.pinkGlow : colors.plumGlow} stopOpacity={0.8} />
+            <Stop offset="0" stopColor={variant === 'light' ? colors.pinkGlow : colors.plumGlow} stopOpacity={0.7} />
             <Stop offset="1" stopColor={variant === 'light' ? colors.pinkGlow : colors.plumGlow} stopOpacity={0} />
           </RadialGradient>
         </Defs>
-        <Rect width="100%" height="100%" fill={variant === 'light' ? colors.white : 'url(#darkBase)'} />
+        <Rect width="100%" height="100%" fill={variant === 'light' ? 'url(#lightBase)' : 'url(#darkBase)'} />
         <Rect width="100%" height="100%" fill="url(#glowTopRight)" />
         <Rect width="100%" height="100%" fill="url(#glowBottomLeft)" />
       </Svg>

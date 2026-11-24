@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "voyc",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#0F4C5C",
+    "backgroundColor": "#471448",
     "ios": {
       "bundleIdentifier": "com.voyc.date",
       "supportsTablet": false,
@@ -19,7 +19,7 @@
       "package": "com.voyc.date",
       "allowBackup": false,
       "adaptiveIcon": {
-        "backgroundColor": "#08343F",
+        "backgroundColor": "#2A0B2B",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -44,7 +44,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0F4C5C",
+          "backgroundColor": "#471448",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 220
         }
@@ -73,7 +73,7 @@
         "expo-notifications",
         {
           "icon": "./assets/images/icon.png",
-          "color": "#0F4C5C",
+          "color": "#471448",
           "defaultChannel": "voyc-default",
           "sounds": []
         }
