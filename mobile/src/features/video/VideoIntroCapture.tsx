@@ -1,4 +1,5 @@
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { CheckCircle2, RotateCcw, ShieldAlert } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -11,7 +12,7 @@ import { colors, fontFamily, radii, spacing } from '@/theme';
 
 import { requestVideoCheck, retryVideoCheck, submitVideoIntro } from './videoIntro';
 
-// 720p at ~1.2 Mbit/s keeps a 10-second intro around 1.5 MB on every phone, so no server transcoding is needed.
+// 720p at ~1.2 Mbit/s keeps uploads small; the server re-encodes to a cross-platform H.264 MP4.
 const VIDEO_BITRATE = 1_200_000;
 const PROMPT = 'Face the camera. Say your name, your age and where you’re from.';
 
@@ -226,7 +227,16 @@ function CameraStage({
   );
 }
 
-function Playback({ uri, muted = false }: { uri: string; muted?: boolean }) {
+function Playback({
+  uri,
+  posterUrl,
+  muted = false,
+}: {
+  uri: string;
+  posterUrl?: string | null;
+  muted?: boolean;
+}) {
+  const [showPoster, setShowPoster] = useState(Boolean(posterUrl));
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
     p.muted = muted;
@@ -234,7 +244,16 @@ function Playback({ uri, muted = false }: { uri: string; muted?: boolean }) {
   });
   return (
     <View style={styles.frame}>
-      <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        nativeControls={false}
+        onFirstFrameRender={() => setShowPoster(false)}
+      />
+      {showPoster && posterUrl ? (
+        <Image source={{ uri: posterUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+      ) : null}
     </View>
   );
 }
@@ -293,7 +312,7 @@ function CheckStatus({
   if (videoIntro.status === 'approved') {
     return (
       <View style={styles.stack}>
-        <Playback uri={videoIntro.url} muted />
+        <Playback uri={videoIntro.url} posterUrl={videoIntro.posterUrl} muted />
         <View style={styles.statusRow}>
           <CheckCircle2 size={20} color={colors.success} />
           <AppText variant="bodyStrong" color="text">

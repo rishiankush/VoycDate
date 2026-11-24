@@ -25,8 +25,16 @@ function stageLine(match: Match, uid: string) {
       : `Waiting for ${other}’s first voice note${expiry}`;
   }
   const last = match.lastMessage;
-  const preview = last ? `${last.senderId === uid ? 'You: ' : ''}Voice note · ${clock(last.durationMs ?? 0)}` : 'Voice chat';
+  const you = last?.senderId === uid ? 'You: ' : '';
+  const preview = !last
+    ? 'Say hello'
+    : last.type === 'text'
+      ? `${you}${last.text ?? 'Message'}`
+      : last.type === 'photo'
+        ? `${you}Photo`
+        : `${you}Voice note · ${clock(last.durationMs ?? 0)}`;
   if (match.stage === 'deciding') return `${preview} · Decide on text`;
+  if (match.stage === 'text_unlocked') return `${preview} · Text unlocked`;
   return `${preview} · Voice ${Math.min(match.voice?.qualifiedCount ?? 0, 3)} of 3`;
 }
 

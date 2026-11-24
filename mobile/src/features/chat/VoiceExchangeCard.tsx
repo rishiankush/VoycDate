@@ -29,8 +29,10 @@ export function VoiceExchangeCard({ match, uid, otherName, now }: VoiceExchangeC
       match.firstSenderId === uid
         ? `You liked ${otherName} first, so you send the first voice note${left !== null ? `. ${left}h left before this match expires.` : '.'}`
         : `${otherName} liked you first, so they send the first voice note${left !== null ? `. They have ${left}h.` : '.'}`;
-  } else if (match.stage === 'deciding' || match.stage === 'text_unlocked') {
-    body = 'You’ve exchanged 3 voice notes. Next, you’ll each privately decide whether to unlock text chat.';
+  } else if (match.stage === 'deciding') {
+    body = 'You’ve exchanged enough voice notes. Decide privately whether to unlock text chat.';
+  } else if (match.stage === 'text_unlocked') {
+    body = 'Text chat is unlocked. You can still send voice notes anytime.';
   } else if (match.stage === 'expired') {
     body = 'This match expired because no voice note was sent in time.';
   } else {

@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { FieldValue, type DocumentData, type DocumentReference } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { logger } from 'firebase-functions';
@@ -11,6 +13,7 @@ import { transcribe } from './transcription/groq';
 
 const MIN_FACE_FRAMES = 2;
 const MIN_SPOKEN_WORDS = 3;
+const CLAIM_TTL_MS = 150_000;
 
 const REASONS = {
   unsafe: 'This video can’t be used because it may contain inappropriate content.',
@@ -21,10 +24,39 @@ const REASONS = {
 
 const PHOTO_REJECTED = 'A photo was removed because it doesn’t meet our community guidelines.';
 
-type VideoIntro = { path: string; durationMs: number; status: string; checkNonce?: number | string };
+type VideoIntro = {
+  path: string;
+  durationMs: number;
+  status: string;
+  checkNonce?: number | string;
+  checkClaim?: string;
+  checkClaimedAt?: { toMillis(): number };
+};
+
+/** Only one of callable + Firestore trigger should process the same pending upload. */
+async function claimVideoCheck(ref: DocumentReference, video: VideoIntro) {
+  const claimId = randomUUID();
+  return db().runTransaction(async (tx) => {
+    const current = (await tx.get(ref)).data()?.videoIntro as VideoIntro | undefined;
+    if (!current || current.path !== video.path || current.status !== 'pending') return null;
+    const claimedAt = current.checkClaimedAt?.toMillis?.() ?? 0;
+    if (current.checkClaim && Date.now() - claimedAt < CLAIM_TTL_MS) return null;
+    tx.update(ref, {
+      'videoIntro.checkClaim': claimId,
+      'videoIntro.checkClaimedAt': FieldValue.serverTimestamp(),
+    });
+    return claimId;
+  });
+}
 
 /** Verifies a new video intro shows a real person speaking, with no explicit or violent content. */
 async function checkVideo(ref: DocumentReference, video: VideoIntro) {
+  const claimId = await claimVideoCheck(ref, video);
+  if (!claimId) {
+    logger.info('Video intro check skipped (already claimed)', { path: video.path });
+    return;
+  }
+
   const { frames, audio, streamable } = await processVideo(video.path, video.durationMs);
   const annotations = await annotateImages(
     frames.map((f) => ({ content: f.toString('base64') })),
@@ -56,19 +88,25 @@ async function checkVideo(ref: DocumentReference, video: VideoIntro) {
         ? REASONS.noSpeech
         : null;
 
+  // Unique publish paths so a losing concurrent run never deletes the winner's files.
   const base = video.path.replace(/\.[^./]+$/, '');
+  const publishId = `${video.checkNonce ?? Date.now()}-${claimId.slice(0, 8)}`;
   const published = reason
     ? null
     : {
-        path: `${base}-web.mp4`,
-        posterPath: `${base}-poster.jpg`,
-        url: await uploadWithDownloadUrl(`${base}-web.mp4`, streamable, 'video/mp4'),
-        posterUrl: await uploadWithDownloadUrl(`${base}-poster.jpg`, frames[1] ?? frames[0], 'image/jpeg'),
+        path: `${base}-${publishId}-web.mp4`,
+        posterPath: `${base}-${publishId}-poster.jpg`,
+        url: await uploadWithDownloadUrl(`${base}-${publishId}-web.mp4`, streamable, 'video/mp4'),
+        posterUrl: await uploadWithDownloadUrl(
+          `${base}-${publishId}-poster.jpg`,
+          frames[1] ?? frames[0],
+          'image/jpeg',
+        ),
       };
 
   const applied = await db().runTransaction(async (tx) => {
-    const current = (await tx.get(ref)).data()?.videoIntro;
-    if (current?.path !== video.path) return false;
+    const current = (await tx.get(ref)).data()?.videoIntro as VideoIntro | undefined;
+    if (current?.path !== video.path || current?.checkClaim !== claimId) return false;
     tx.update(ref, {
       ...(published && {
         'videoIntro.path': published.path,
@@ -81,14 +119,15 @@ async function checkVideo(ref: DocumentReference, video: VideoIntro) {
       'videoIntro.transcript': transcript,
       'videoIntro.checks': { faceFrames, unsafe, spokenWords },
       'videoIntro.checkedAt': FieldValue.serverTimestamp(),
+      'videoIntro.checkClaim': FieldValue.delete(),
+      'videoIntro.checkClaimedAt': FieldValue.delete(),
     });
     return true;
   });
 
-  // The original upload is replaced by the streaming copy, or discarded when rejected.
   if (applied) await deleteQuietly(video.path);
   else if (published) await Promise.all([deleteQuietly(published.path), deleteQuietly(published.posterPath)]);
-  logger.info('Video intro checked', { path: video.path, approved: !reason, faceFrames, unsafe, spokenWords });
+  logger.info('Video intro checked', { path: video.path, approved: !reason, faceFrames, unsafe, spokenWords, applied });
 }
 
 /** Removes newly added photos that contain explicit or violent content. */
@@ -127,7 +166,12 @@ async function runPendingVideoCheck(uid: string) {
     await checkVideo(ref, video);
   } catch (error) {
     logger.error('Video intro check failed', { uid, error: String(error) });
-    await ref.update({ 'videoIntro.status': 'error', 'videoIntro.rejectionReason': REASONS.error });
+    await ref.update({
+      'videoIntro.status': 'error',
+      'videoIntro.rejectionReason': REASONS.error,
+      'videoIntro.checkClaim': FieldValue.delete(),
+      'videoIntro.checkClaimedAt': FieldValue.delete(),
+    });
   }
   const latest = (await ref.get()).data()?.videoIntro as VideoIntro | undefined;
   return { status: latest?.status ?? null };
@@ -162,7 +206,12 @@ export const moderateProfileMedia = onDocumentWritten(
         await checkVideo(after.ref, video);
       } catch (error) {
         logger.error('Video intro check failed', { uid: event.params.uid, error: String(error) });
-        await after.ref.update({ 'videoIntro.status': 'error', 'videoIntro.rejectionReason': REASONS.error });
+        await after.ref.update({
+          'videoIntro.status': 'error',
+          'videoIntro.rejectionReason': REASONS.error,
+          'videoIntro.checkClaim': FieldValue.delete(),
+          'videoIntro.checkClaimedAt': FieldValue.delete(),
+        });
       }
     }
 

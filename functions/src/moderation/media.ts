@@ -14,15 +14,15 @@ export const FRAME_WIDTH = 480;
 
 async function ffmpeg(args: string[]) {
   if (!ffmpegPath) throw new Error('ffmpeg binary unavailable');
-  await run(ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', ...args], { timeout: 30_000 });
+  await run(ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', ...args], { timeout: 90_000 });
 }
 
 /**
  * Downloads a video once and derives everything moderation needs: evenly spaced JPEG frames, the audio track,
- * and a streaming-friendly MP4 (moov atom first, no re-encode) so playback starts before the file finishes loading.
+ * and a cross-platform H.264/AAC MP4 (Android uploads often don't play after a stream-copy remux).
  */
 export async function processVideo(storagePath: string, durationMs: number, frameCount = 3) {
-  const dir = await mkdtemp(join(tmpdir(), 'tung-video-'));
+  const dir = await mkdtemp(join(tmpdir(), 'voyc-video-'));
   try {
     const input = join(dir, 'input');
     await getStorage().bucket().file(storagePath).download({ destination: input });
@@ -45,8 +45,32 @@ export async function processVideo(storagePath: string, durationMs: number, fram
       audio = null;
     }
 
+    // Re-encode instead of `-c copy`: Android Camera recordings vary (3GP/HEVC/rotation) and stream-copy
+    // often yields files that approve (frames extracted) but play as black/empty on iOS and Android.
     const streamable = join(dir, 'stream.mp4');
-    await ffmpeg(['-i', input, '-c', 'copy', '-movflags', '+faststart', streamable]);
+    await ffmpeg([
+      '-i',
+      input,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '23',
+      '-pix_fmt',
+      'yuv420p',
+      '-vf',
+      'scale=720:-2',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '96k',
+      '-ac',
+      '1',
+      '-movflags',
+      '+faststart',
+      streamable,
+    ]);
     return { frames, audio, streamable: await readFile(streamable) };
   } finally {
     await rm(dir, { recursive: true, force: true });

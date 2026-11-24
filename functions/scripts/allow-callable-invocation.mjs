@@ -14,7 +14,17 @@ import { GoogleAuth } from 'google-auth-library';
 
 const PROJECT_ID = 'voyc-date';
 const REGION = 'us-central1';
-const CALLABLES = ['ping', 'getDiscoveryFeed', 'swipe', 'sendVoiceMessage', 'markMatchRead', 'checkVideoIntro'];
+const CALLABLES = [
+  'ping',
+  'getDiscoveryFeed',
+  'swipe',
+  'sendVoiceMessage',
+  'markMatchRead',
+  'checkVideoIntro',
+  'submitUnlockDecision',
+  'sendTextMessage',
+  'sendPhotoMessage',
+];
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const globalRoot = execSync('npm root -g').toString().trim();

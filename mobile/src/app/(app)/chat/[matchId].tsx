@@ -1,18 +1,36 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Info, Lock } from 'lucide-react-native';
+import { ChevronLeft, ImagePlus, Info, Lock, SendHorizontal } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Switch, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Switch,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, GlowBackground, IconButton } from '@/components/ui';
 import { useSession } from '@/features/auth/SessionProvider';
 import { ChatPlayerProvider } from '@/features/chat/ChatPlayer';
+import { PhotoBubble } from '@/features/chat/PhotoBubble';
 import { RecordButton } from '@/features/chat/RecordButton';
 import { CONVERSATION_STARTERS } from '@/features/chat/starters';
+import { TextBubble } from '@/features/chat/TextBubble';
 import type { ChatMessage } from '@/features/chat/types';
+import { UnlockCard } from '@/features/chat/UnlockCard';
 import { useCaptionsPreference } from '@/features/chat/useCaptionsPreference';
-import { markMatchRead, useMatch, useMessages, useVoiceSender } from '@/features/chat/useChat';
+import {
+  markMatchRead,
+  useMatch,
+  useMessages,
+  usePhotoSender,
+  useTextSender,
+  useVoiceSender,
+} from '@/features/chat/useChat';
 import { VoiceBubble } from '@/features/chat/VoiceBubble';
 import { VoiceExchangeCard } from '@/features/chat/VoiceExchangeCard';
 import type { Match } from '@/features/matches/useMatches';
@@ -37,8 +55,8 @@ function buildRows(messages: ChatMessage[], now: Date): Row[] {
     const label = dayLabel(message.createdAt?.toDate() ?? now, now);
     if (label !== lastLabel) {
       rows.push({ kind: 'day', id: `day-${label}-${message.id}`, label });
-      lastLabel = label;
     }
+    lastLabel = label;
     rows.push({ kind: 'message', id: message.id, message });
   }
   return rows;
@@ -62,15 +80,42 @@ function helperText(match: Match, uid: string, otherId: string, otherName: strin
   return `${count} · under 3 seconds doesn’t count`;
 }
 
+function MessageRow({
+  message,
+  mine,
+  captionsOn,
+  onRetryVoice,
+  onRetryText,
+  onRetryPhoto,
+}: {
+  message: ChatMessage;
+  mine: boolean;
+  captionsOn: boolean;
+  onRetryVoice: () => void;
+  onRetryText: () => void;
+  onRetryPhoto: () => void;
+}) {
+  if (message.type === 'text') {
+    return <TextBubble message={message} mine={mine} onRetry={onRetryText} />;
+  }
+  if (message.type === 'photo') {
+    return <PhotoBubble message={message} mine={mine} onRetry={onRetryPhoto} />;
+  }
+  return <VoiceBubble message={message} mine={mine} captionsOn={captionsOn} onRetry={onRetryVoice} />;
+}
+
 export default function ChatScreen() {
   const { matchId } = useLocalSearchParams<{ matchId: string }>();
   const { user } = useSession();
   const uid = user?.uid ?? '';
   const { match, loading } = useMatch(matchId);
   const messages = useMessages(matchId);
-  const { pending, send, retry } = useVoiceSender(matchId, uid);
+  const voice = useVoiceSender(matchId, uid);
+  const text = useTextSender(matchId, uid);
+  const photo = usePhotoSender(matchId, uid);
   const [captionsOn, setCaptionsOn] = useCaptionsPreference();
   const [starter, setStarter] = useState(0);
+  const [draft, setDraft] = useState('');
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -83,6 +128,7 @@ export default function ChatScreen() {
     if (unread > 0) markMatchRead(matchId);
   }, [unread, matchId]);
 
+  const pending = [...voice.pending, ...text.pending, ...photo.pending];
   const rows = useMemo(
     () => buildRows([...messages, ...pending.filter((p) => !messages.some((m) => m.id === p.id))], new Date(now)),
     [messages, pending, now],
@@ -108,8 +154,15 @@ export default function ChatScreen() {
   const other = match.people?.[otherId] ?? { firstName: 'Your match', photoUrl: null };
   const expired = match.status === 'expired' || match.stage === 'expired';
   const waitingForThem = match.stage === 'awaiting_first_voice' && match.firstSenderId !== uid;
+  const unlocked = match.stage === 'text_unlocked';
   const canRecord = match.status === 'active' && !expired && !waitingForThem;
   const helper = helperText(match, uid, otherId, other.firstName);
+
+  const sendDraft = async () => {
+    const value = draft;
+    setDraft('');
+    await text.send(value);
+  };
 
   return (
     <ChatPlayerProvider>
@@ -136,7 +189,10 @@ export default function ChatScreen() {
             keyExtractor={(row) => row.id}
             contentContainerStyle={styles.list}
             ListHeaderComponent={
-              <VoiceExchangeCard match={match} uid={uid} otherName={other.firstName} now={now} />
+              <View style={styles.headerCards}>
+                <VoiceExchangeCard match={match} uid={uid} otherName={other.firstName} now={now} />
+                {match.stage === 'deciding' ? <UnlockCard match={match} uid={uid} otherName={other.firstName} /> : null}
+              </View>
             }
             renderItem={({ item }) =>
               item.kind === 'day' ? (
@@ -144,16 +200,18 @@ export default function ChatScreen() {
                   {item.label}
                 </AppText>
               ) : (
-                <VoiceBubble
+                <MessageRow
                   message={item.message}
                   mine={item.message.senderId === uid}
                   captionsOn={captionsOn}
-                  onRetry={() => retry(item.message)}
+                  onRetryVoice={() => voice.retry(item.message)}
+                  onRetryText={() => text.retry(item.message)}
+                  onRetryPhoto={() => photo.retry(item.message)}
                 />
               )
             }
             ListFooterComponent={
-              canRecord ? (
+              canRecord && !unlocked ? (
                 <View style={styles.footer}>
                   {helper ? (
                     <View style={styles.helper}>
@@ -178,7 +236,58 @@ export default function ChatScreen() {
           />
 
           <View style={styles.composer}>
-            {canRecord ? (
+            {canRecord && unlocked ? (
+              <View style={styles.unlockedComposer}>
+                <View style={styles.textRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Send a photo"
+                    onPress={photo.pickAndSend}
+                    disabled={photo.sending}
+                    style={styles.iconBtn}>
+                    <ImagePlus size={22} color={colors.plum} />
+                  </Pressable>
+                  <TextInput
+                    style={styles.input}
+                    value={draft}
+                    onChangeText={setDraft}
+                    placeholder="Say something…"
+                    placeholderTextColor={colors.placeholder}
+                    multiline
+                    maxLength={2000}
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Send message"
+                    onPress={sendDraft}
+                    disabled={!draft.trim() || text.sending}
+                    style={[styles.iconBtn, styles.sendBtn, (!draft.trim() || text.sending) && styles.sendDisabled]}>
+                    <SendHorizontal size={18} color={colors.white} />
+                  </Pressable>
+                </View>
+                <View style={styles.voiceRow}>
+                  <View style={styles.side}>
+                    <Switch
+                      value={captionsOn}
+                      onValueChange={setCaptionsOn}
+                      trackColor={{ true: colors.plum, false: colors.pinkBorder }}
+                      thumbColor={colors.white}
+                      ios_backgroundColor={colors.pinkBorder}
+                      accessibilityLabel="Captions"
+                    />
+                    <AppText variant="caption" color="text">
+                      Captions {captionsOn ? 'on' : 'off'}
+                    </AppText>
+                  </View>
+                  <RecordButton onRecorded={voice.send} />
+                  <View style={styles.side}>
+                    <AppText variant="caption" color="textMuted" align="center">
+                      Voice still works
+                    </AppText>
+                  </View>
+                </View>
+              </View>
+            ) : canRecord ? (
               <>
                 <View style={styles.side}>
                   <Switch
@@ -193,7 +302,7 @@ export default function ChatScreen() {
                     Captions {captionsOn ? 'on' : 'off'}
                   </AppText>
                 </View>
-                <RecordButton onRecorded={send} />
+                <RecordButton onRecorded={voice.send} />
                 <View style={styles.side}>
                   <View style={styles.lock}>
                     <Lock size={18} color={colors.textMuted} />
@@ -251,6 +360,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     gap: spacing.sm,
   },
+  headerCards: {
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
   day: {
     marginVertical: spacing.sm,
   },
@@ -274,15 +387,55 @@ const styles = StyleSheet.create({
     backgroundColor: colors.pink,
   },
   composer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     marginHorizontal: layout.screenPadding,
     marginBottom: spacing.xs,
     padding: spacing.md,
     borderRadius: radii.lg + 4,
     backgroundColor: colors.white,
     ...shadows.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  unlockedComposer: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  textRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+  },
+  voiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  input: {
+    flex: 1,
+    minHeight: 40,
+    maxHeight: 120,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.md,
+    backgroundColor: colors.pinkTint,
+    color: colors.text,
+    fontFamily: fontFamily.sansRegular,
+    fontSize: 16,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.pinkTint,
+  },
+  sendBtn: {
+    backgroundColor: colors.plum,
+  },
+  sendDisabled: {
+    opacity: 0.45,
   },
   side: {
     width: 84,

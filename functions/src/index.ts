@@ -16,7 +16,13 @@ export {
   syncDiscoveryFromUser,
 } from './discovery';
 export { expireMatches } from './expiry';
-export { markMatchRead, sendVoiceMessage } from './messages';
+export {
+  markMatchRead,
+  sendPhotoMessage,
+  sendTextMessage,
+  sendVoiceMessage,
+  submitUnlockDecision,
+} from './messages';
 export { swipe } from './swipe';
 export { checkVideoIntro, moderateProfileMedia } from './moderation';
 export { transcribeVoiceMessage } from './transcription';

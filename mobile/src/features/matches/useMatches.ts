@@ -2,6 +2,7 @@ import { collection, onSnapshot, orderBy, query, where, type Timestamp } from 'f
 import { useEffect, useState } from 'react';
 
 import { useSession } from '@/features/auth/SessionProvider';
+import type { UnlockDecision } from '@/features/chat/types';
 import { db } from '@/lib/firebase';
 
 export type MatchStage = 'awaiting_first_voice' | 'voice' | 'deciding' | 'text_unlocked' | 'expired';
@@ -14,8 +15,12 @@ export type Match = {
   stage: MatchStage;
   status: 'active' | 'unmatched' | 'blocked' | 'expired';
   voice?: { qualifiedCount: number; perUser: Record<string, number>; totalDurationMs?: number };
+  unlock?: {
+    votes?: Record<string, UnlockDecision>;
+    nextPromptAtCount?: number | null;
+  };
   unread?: Record<string, number>;
-  lastMessage?: { senderId: string; type: 'voice' | 'text'; durationMs?: number } | null;
+  lastMessage?: { senderId: string; type: 'voice' | 'text' | 'photo'; durationMs?: number; text?: string } | null;
   lastMessageAt: Timestamp | null;
   createdAt: Timestamp | null;
   expiresAt: Timestamp | null;

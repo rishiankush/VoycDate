@@ -36,6 +36,15 @@ service firebase.storage {
         && request.resource.contentType.matches('audio/.*');
     }
 
+    // Membership is checked by sendPhotoMessage; the recipient loads via download URL.
+    match /matches/{matchId}/photos/{fileName} {
+      allow read: if request.auth != null && resource.metadata.uploaderId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.metadata.uploaderId == request.auth.uid
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -32,7 +32,7 @@ export function VoiceBubble({ message, mine, captionsOn, onRetry }: VoiceBubbleP
   const progress = isCurrent ? player.progress : 0;
   const sending = message.local?.status === 'sending';
   const failed = message.local?.status === 'failed';
-  const uri = message.local?.uri ?? message.audioUrl;
+  const uri = message.local?.uri ?? message.audioUrl ?? '';
 
   const transcript = message.transcript?.status === 'done' ? message.transcript.text : null;
   const captionVisible = transcript ? (showCaption ?? captionsOn) : false;
@@ -43,8 +43,8 @@ export function VoiceBubble({ message, mine, captionsOn, onRetry }: VoiceBubbleP
     <View style={[styles.wrapper, mine ? styles.mineWrapper : styles.theirsWrapper]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${playing ? 'Pause' : 'Play'} ${mine ? 'your' : 'their'} voice message, ${clock(message.durationMs)}`}
-        onPress={() => (failed ? onRetry?.() : player.toggle(message.id, uri))}
+        accessibilityLabel={`${playing ? 'Pause' : 'Play'} ${mine ? 'your' : 'their'} voice message, ${clock(message.durationMs ?? 0)}`}
+        onPress={() => (failed ? onRetry?.() : uri ? player.toggle(message.id, uri) : undefined)}
         style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
         <View style={[styles.play, mine ? styles.playMine : styles.playTheirs]}>
           {sending ? (
@@ -58,7 +58,7 @@ export function VoiceBubble({ message, mine, captionsOn, onRetry }: VoiceBubbleP
           )}
         </View>
         <View style={styles.wave}>
-          {bars(message.waveform).map((h, i) => (
+          {bars(message.waveform ?? []).map((h, i) => (
             <View
               key={i}
               style={[
@@ -71,7 +71,7 @@ export function VoiceBubble({ message, mine, captionsOn, onRetry }: VoiceBubbleP
           ))}
         </View>
         <AppText variant="label" color={mine ? 'white' : 'plum'} style={styles.duration}>
-          {clock(message.durationMs)}
+          {clock(message.durationMs ?? 0)}
         </AppText>
       </Pressable>
 
