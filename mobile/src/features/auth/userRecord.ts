@@ -23,6 +23,9 @@ export type UserRecord = {
   paused?: boolean;
   notificationsPermission?: 'granted' | 'denied' | 'undetermined';
   communityPromiseAcceptedAt?: Timestamp | null;
+  /** Server-managed Premium entitlement (RevenueCat later). */
+  premium?: { active?: boolean; source?: string; expiresAt?: Timestamp | null };
+  likesQuota?: { dayKey?: string; count?: number };
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
 };

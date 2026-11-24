@@ -2,6 +2,9 @@ import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useRef } from 'react';
 
+import { useSession } from '@/features/auth/SessionProvider';
+import { registerPushToken } from '@/features/notifications/pushToken';
+
 /**
  * Location and notification prompts live in onboarding. Returning users (reinstall + same
  * phone number) skip those screens, so ask once on first active-session launch when the OS
@@ -9,6 +12,7 @@ import { useEffect, useRef } from 'react';
  */
 export function useStartupPermissions(enabled: boolean) {
   const asked = useRef(false);
+  const { user } = useSession();
 
   useEffect(() => {
     if (!enabled || asked.current) return;
@@ -29,9 +33,10 @@ export function useStartupPermissions(enabled: boolean) {
         if (notifications.status === Notifications.PermissionStatus.UNDETERMINED) {
           await Notifications.requestPermissionsAsync();
         }
+        if (user?.uid) await registerPushToken(user.uid);
       } catch {
         // Same as above — never block the app on permission APIs.
       }
     })();
-  }, [enabled]);
+  }, [enabled, user?.uid]);
 }

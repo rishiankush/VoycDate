@@ -63,6 +63,14 @@ export type Profile = {
   moderation?: { lastRejection?: { reason: string; at: { toMillis(): number } | null } };
 };
 
+export type NotificationPrefs = {
+  newMatch?: boolean;
+  voiceMessage?: boolean;
+  textPhoto?: boolean;
+  unlock?: boolean;
+  expiry?: boolean;
+};
+
 export type Preferences = {
   showMe?: ShowMe;
   ageRange?: { min: number; max: number };
@@ -71,4 +79,5 @@ export type Preferences = {
   showAge?: boolean;
   /** When false, others don’t see how far away you are. */
   showDistance?: boolean;
+  notifications?: NotificationPrefs;
 };

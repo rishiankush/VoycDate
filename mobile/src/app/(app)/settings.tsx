@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import {
   Ban,
   ChevronRight,
+  Crown,
   Download,
   FileText,
   HelpCircle,
@@ -19,6 +20,7 @@ import { Alert, Linking, Pressable, StyleSheet, Switch, View } from 'react-nativ
 import { AppText, Button, IconButton, Screen } from '@/components/ui';
 import { deleteAccount, requestDataExport } from '@/features/account/account';
 import { useSession } from '@/features/auth/SessionProvider';
+import { setPremiumStatus } from '@/features/premium/premium';
 import { useMyProfile } from '@/features/profile/MyProfileProvider';
 import { colors, radii, spacing } from '@/theme';
 
@@ -103,10 +105,11 @@ function ToggleRow({
 }
 
 export default function SettingsScreen() {
-  const { signOut } = useSession();
+  const { signOut, record } = useSession();
   const { preferences, paused, savePreferences, setPaused } = useMyProfile();
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const isPremium = Boolean(record?.premium?.active);
 
   const showAge = preferences.showAge !== false;
   const showDistance = preferences.showDistance !== false;
@@ -170,6 +173,34 @@ export default function SettingsScreen() {
           <IconButton accessibilityLabel="Close" onPress={router.back} icon={<X size={20} color={colors.plum} />} />
         </View>
       }>
+      <Section title="Subscription">
+        <Row
+          icon={<Crown size={18} color={colors.plum} />}
+          title={isPremium ? 'Premium is on' : 'Upgrade to Premium'}
+          subtitle={isPremium ? 'Unlimited likes · see who likes you' : 'See likes · unlimited likes'}
+          onPress={() => router.push('/(app)/paywall')}
+          last={!isPremium}
+        />
+        {isPremium ? (
+          <Row
+            title="Turn off Premium"
+            subtitle="Back to free daily likes"
+            onPress={() => {
+              Alert.alert('Turn off Premium?', 'You’ll go back to the free daily like limit.', [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Turn off',
+                  style: 'destructive',
+                  onPress: () =>
+                    setPremiumStatus(false).catch(() => Alert.alert('Couldn’t update Premium')),
+                },
+              ]);
+            }}
+            last
+          />
+        ) : null}
+      </Section>
+
       <Section title="Discovery">
         <Row
           icon={<SlidersHorizontal size={18} color={colors.plum} />}
@@ -182,6 +213,42 @@ export default function SettingsScreen() {
           subtitle="Hidden on Discover · matches stay open"
           value={paused}
           onChange={(next) => setPaused(next).catch(() => Alert.alert('Couldn’t update pause'))}
+          last
+        />
+      </Section>
+
+      <Section title="Notifications">
+        <ToggleRow
+          title="New matches"
+          subtitle="When you match with someone"
+          value={preferences.notifications?.newMatch !== false}
+          onChange={(next) =>
+            savePreferences({ notifications: { ...preferences.notifications, newMatch: next } })
+          }
+        />
+        <ToggleRow
+          title="Voice notes"
+          subtitle="When someone sends you a voice note"
+          value={preferences.notifications?.voiceMessage !== false}
+          onChange={(next) =>
+            savePreferences({ notifications: { ...preferences.notifications, voiceMessage: next } })
+          }
+        />
+        <ToggleRow
+          title="Texts & photos"
+          subtitle="When someone messages you after unlock"
+          value={preferences.notifications?.textPhoto !== false}
+          onChange={(next) =>
+            savePreferences({ notifications: { ...preferences.notifications, textPhoto: next } })
+          }
+        />
+        <ToggleRow
+          title="Unlock updates"
+          subtitle="When text chat is ready or unlocked"
+          value={preferences.notifications?.unlock !== false}
+          onChange={(next) =>
+            savePreferences({ notifications: { ...preferences.notifications, unlock: next } })
+          }
           last
         />
       </Section>

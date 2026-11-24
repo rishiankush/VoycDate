@@ -31,6 +31,8 @@ const CALLABLES = [
   'listBlockedUsers',
   'requestDataExport',
   'deleteAccount',
+  'getLikesTab',
+  'setPremiumStatus',
 ];
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 

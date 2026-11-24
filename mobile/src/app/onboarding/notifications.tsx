@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui';
+import { useSession } from '@/features/auth/SessionProvider';
+import { registerPushToken } from '@/features/notifications/pushToken';
 import { OnboardingScreen } from '@/features/onboarding/OnboardingScreen';
 import { useOnboardingStep } from '@/features/onboarding/useOnboardingStep';
 import { colors, radii, spacing } from '@/theme';
@@ -17,12 +19,16 @@ const REASONS: { icon: ReactNode; text: string }[] = [
 ];
 
 export default function NotificationsStep() {
+  const { user } = useSession();
   const { complete, saving } = useOnboardingStep(STEP);
 
   const enable = async () => {
     let status: Notifications.PermissionStatus = Notifications.PermissionStatus.UNDETERMINED;
     try {
       ({ status } = await Notifications.requestPermissionsAsync());
+      if (status === Notifications.PermissionStatus.GRANTED && user?.uid) {
+        await registerPushToken(user.uid);
+      }
     } catch {
       // Permission prompts can be unavailable (e.g. some emulators); continue onboarding regardless.
     }

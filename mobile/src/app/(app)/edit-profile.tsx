@@ -1,187 +1,186 @@
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { X } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
-
-import { AppText, Button, ChipGroup, IconButton, Screen, SelectTile, TextField } from '@/components/ui';
 import {
-  BIO_MAX,
-  HABITS,
-  INTEREST_CATEGORIES,
-  INTENTS,
-  MAX_INTERESTS,
-  MAX_PROMPTS,
-  MAX_VALUES,
-  PROMPT_ANSWER_MAX,
-  PROMPTS,
-  VALUES,
-} from '@/features/onboarding/options';
-import type { ProfilePrompt } from '@/features/onboarding/types';
+  Briefcase,
+  ChevronLeft,
+  Cigarette,
+  Dumbbell,
+  GlassWater,
+  Heart,
+  Plus,
+  Ruler,
+} from 'lucide-react-native';
+import { StyleSheet, View } from 'react-native';
+
+import { AppText, IconButton, Screen } from '@/components/ui';
+import { INTENTS, MAX_PHOTOS } from '@/features/onboarding/options';
+import { formatHeight } from '@/features/onboarding/units';
+import { AttributeRow, EditCard, Pill, SectionHeader } from '@/features/profile/ProfileRows';
 import { useMyProfile } from '@/features/profile/MyProfileProvider';
-import { colors, spacing } from '@/theme';
+import { colors, layout, radii, spacing } from '@/theme';
+
+function openSection(section: string) {
+  router.push({ pathname: '/(app)/edit-section', params: { section } });
+}
 
 export default function EditProfileScreen() {
-  const { profile, saveProfile } = useMyProfile();
-  const [bio, setBio] = useState(profile.bio ?? '');
-  const [intent, setIntent] = useState(profile.intent ?? '');
-  const [interests, setInterests] = useState<string[]>(profile.interests ?? []);
-  const [values, setValues] = useState<string[]>(profile.values ?? []);
-  const [drinking, setDrinking] = useState(profile.habits?.drinking ?? '');
-  const [smoking, setSmoking] = useState(profile.habits?.smoking ?? '');
-  const [exercise, setExercise] = useState(profile.habits?.exercise ?? '');
-  const [prompts, setPrompts] = useState<ProfilePrompt[]>(
-    profile.prompts?.length
-      ? profile.prompts
-      : [{ id: '1', question: PROMPTS[0], answer: '' }],
-  );
-  const [saving, setSaving] = useState(false);
-
-  const interestOptions = useMemo(() => INTEREST_CATEGORIES.flatMap((c) => c.options), []);
-
-  const save = async () => {
-    const trimmedBio = bio.trim();
-    const cleanedPrompts = prompts
-      .map((p, i) => ({
-        id: p.id || String(i + 1),
-        question: p.question,
-        answer: p.answer.trim(),
-      }))
-      .filter((p) => p.answer.length > 0)
-      .slice(0, MAX_PROMPTS);
-
-    setSaving(true);
-    try {
-      await saveProfile({
-        bio: trimmedBio,
-        intent: intent || undefined,
-        interests,
-        values,
-        habits: {
-          drinking: drinking || undefined,
-          smoking: smoking || undefined,
-          exercise: exercise || undefined,
-        },
-        prompts: cleanedPrompts,
-      });
-      router.back();
-    } catch {
-      Alert.alert('Couldn’t save', 'Check your connection and try again.');
-      setSaving(false);
-    }
-  };
+  const { profile } = useMyProfile();
+  const photos = profile.photos ?? [];
+  const slots = Array.from({ length: MAX_PHOTOS }, (_, i) => photos[i] ?? null);
+  const intentLabel = INTENTS.find((i) => i.value === profile.intent)?.label;
+  const habits = [
+    profile.habits?.exercise,
+    profile.habits?.drinking,
+    profile.habits?.smoking,
+  ].filter(Boolean);
+  const lifestyleSummary = habits.length ? habits.join(' · ') : null;
 
   return (
     <Screen
       header={
         <View style={styles.header}>
-          <AppText variant="heading">Edit profile</AppText>
-          <IconButton accessibilityLabel="Close" onPress={router.back} icon={<X size={20} color={colors.plum} />} />
+          <IconButton
+            accessibilityLabel="Back"
+            onPress={router.back}
+            icon={<ChevronLeft size={22} color={colors.plum} />}
+          />
+          <AppText variant="heading" style={styles.headerTitle}>
+            Edit profile
+          </AppText>
+          <View style={styles.headerSpacer} />
         </View>
-      }
-      footer={<Button title="Save" onPress={save} loading={saving} />}>
-      <View style={styles.section}>
-        <AppText variant="label">About me</AppText>
-        <TextField
-          placeholder="A few lines about you"
-          value={bio}
-          onChangeText={setBio}
-          multiline
-          maxLength={BIO_MAX}
-          helperText={`${bio.length}/${BIO_MAX}`}
-        />
+      }>
+      <View style={styles.grid}>
+        {slots.map((photo, index) => (
+          <PressableSlot key={index} index={index} uri={photo?.url} isMain={index === 0} />
+        ))}
       </View>
+      <AppText variant="caption" color="textMuted" style={styles.gridHint}>
+        Your photos and video intro show on Discover. Tap a section below to edit details.
+      </AppText>
 
+      <SectionHeader title="About you" subtitle="The basics people see first." />
+      <AttributeRow
+        icon={<Heart size={18} color={colors.plum} />}
+        label="About me"
+        value={profile.bio?.trim() ? profile.bio.trim().slice(0, 42) + (profile.bio.length > 42 ? '…' : '') : null}
+        onPress={() => openSection('about')}
+      />
       {profile.mode === 'date' ? (
-        <View style={styles.section}>
-          <AppText variant="label">Looking for</AppText>
-          <View style={styles.wrap}>
-            {INTENTS.map((option) => (
-              <SelectTile
-                key={option.value}
-                label={option.label}
-                selected={intent === option.value}
-                onPress={() => setIntent(option.value)}
-              />
+        <AttributeRow
+          icon={<Briefcase size={18} color={colors.plum} />}
+          label="Looking for"
+          value={intentLabel}
+          onPress={() => openSection('intent')}
+        />
+      ) : null}
+      <AttributeRow
+        icon={<Ruler size={18} color={colors.plum} />}
+        label="Height"
+        value={profile.heightCm != null ? formatHeight(profile.heightCm) : null}
+        onPress={() => openSection('height')}
+        last
+      />
+
+      <SectionHeader title="Lifestyle" subtitle="Cover the things most people are curious about." />
+      <AttributeRow
+        icon={<Dumbbell size={18} color={colors.plum} />}
+        label="Exercise"
+        value={profile.habits?.exercise}
+        onPress={() => openSection('lifestyle')}
+      />
+      <AttributeRow
+        icon={<GlassWater size={18} color={colors.plum} />}
+        label="Drinking"
+        value={profile.habits?.drinking}
+        onPress={() => openSection('lifestyle')}
+      />
+      <AttributeRow
+        icon={<Cigarette size={18} color={colors.plum} />}
+        label="Smoking"
+        value={profile.habits?.smoking}
+        onPress={() => openSection('lifestyle')}
+        last
+      />
+
+      <SectionHeader title="Interests" subtitle="Get specific about the things you love." />
+      <EditCard
+        accessibilityLabel="Edit interests"
+        onPress={() => openSection('interests')}>
+        {(profile.interests?.length ?? 0) > 0 ? (
+          <View style={styles.pills}>
+            {profile.interests!.map((item) => (
+              <Pill key={item} label={item} />
             ))}
           </View>
-        </View>
-      ) : null}
+        ) : (
+          <AppText variant="body" color="textMuted">
+            Add interests
+          </AppText>
+        )}
+      </EditCard>
 
-      <View style={styles.section}>
-        <AppText variant="label">Interests · {interests.length}/{MAX_INTERESTS}</AppText>
-        <ChipGroup options={interestOptions} selected={interests} onChange={setInterests} max={MAX_INTERESTS} />
-      </View>
-
-      <View style={styles.section}>
-        <AppText variant="label">Values · {values.length}/{MAX_VALUES}</AppText>
-        <ChipGroup options={VALUES} selected={values} onChange={setValues} max={MAX_VALUES} />
-      </View>
-
-      <View style={styles.section}>
-        <AppText variant="label">{HABITS.drinking.label}</AppText>
-        <View style={styles.wrap}>
-          {HABITS.drinking.options.map((option) => (
-            <SelectTile key={option} label={option} selected={drinking === option} onPress={() => setDrinking(option)} />
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <AppText variant="label">{HABITS.smoking.label}</AppText>
-        <View style={styles.wrap}>
-          {HABITS.smoking.options.map((option) => (
-            <SelectTile key={option} label={option} selected={smoking === option} onPress={() => setSmoking(option)} />
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <AppText variant="label">{HABITS.exercise.label}</AppText>
-        <View style={styles.wrap}>
-          {HABITS.exercise.options.map((option) => (
-            <SelectTile key={option} label={option} selected={exercise === option} onPress={() => setExercise(option)} />
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <AppText variant="label">Prompts</AppText>
-        {prompts.map((prompt, index) => (
-          <View key={prompt.id} style={styles.prompt}>
-            <AppText variant="bodyStrong">{prompt.question}</AppText>
-            <TextField
-              placeholder="Your answer"
-              value={prompt.answer}
-              onChangeText={(answer) =>
-                setPrompts((current) => current.map((p, i) => (i === index ? { ...p, answer } : p)))
-              }
-              multiline
-              maxLength={PROMPT_ANSWER_MAX}
-            />
+      <SectionHeader title="Values" subtitle="Choose qualities that matter to you." />
+      <EditCard accessibilityLabel="Edit values" onPress={() => openSection('values')}>
+        {(profile.values?.length ?? 0) > 0 ? (
+          <View style={styles.pills}>
+            {profile.values!.map((item) => (
+              <Pill key={item} label={item} />
+            ))}
           </View>
-        ))}
-        {prompts.length < MAX_PROMPTS ? (
-          <Button
-            title="Add another prompt"
-            variant="secondary"
-            onPress={() =>
-              setPrompts((current) => [
-                ...current,
-                {
-                  id: String(current.length + 1),
-                  question: PROMPTS[current.length % PROMPTS.length],
-                  answer: '',
-                },
-              ])
-            }
-          />
-        ) : null}
-      </View>
+        ) : (
+          <AppText variant="body" color="textMuted">
+            Add values
+          </AppText>
+        )}
+      </EditCard>
 
-      <AppText variant="caption" color="textMuted">
-        Photos and your video intro are managed from onboarding for now — re-record from Profile if needed.
-      </AppText>
+      <SectionHeader title="Prompts" subtitle="Let people know what it’s like to date you." />
+      <EditCard accessibilityLabel="Edit prompts" onPress={() => openSection('prompts')}>
+        {(profile.prompts?.length ?? 0) > 0 ? (
+          <View style={styles.promptPreview}>
+            <AppText variant="bodyStrong">{profile.prompts![0].question}</AppText>
+            <AppText variant="body" color="text">
+              {profile.prompts![0].answer}
+            </AppText>
+            {(profile.prompts?.length ?? 0) > 1 ? (
+              <AppText variant="caption" color="textMuted">
+                +{(profile.prompts?.length ?? 0) - 1} more
+              </AppText>
+            ) : null}
+          </View>
+        ) : (
+          <AppText variant="body" color="textMuted">
+            Add prompts
+          </AppText>
+        )}
+      </EditCard>
+
+      {lifestyleSummary ? (
+        <AppText variant="caption" color="textMuted" style={styles.footerNote}>
+          Tip: stronger profiles fill About, Interests and Prompts.
+        </AppText>
+      ) : null}
     </Screen>
+  );
+}
+
+function PressableSlot({ index, uri, isMain }: { index: number; uri?: string; isMain?: boolean }) {
+  return (
+    <View style={styles.slot}>
+      {uri ? (
+        <Image source={{ uri }} style={styles.slotImage} contentFit="cover" />
+      ) : (
+        <View style={styles.slotEmpty}>
+          <Plus size={22} color={colors.textMuted} />
+        </View>
+      )}
+      <View style={styles.slotBadge}>
+        <AppText variant="label" color="white" style={styles.slotBadgeText}>
+          {isMain ? 'Main' : String(index + 1)}
+        </AppText>
+      </View>
+    </View>
   );
 }
 
@@ -189,19 +188,67 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
-  section: {
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
   },
-  wrap: {
+  headerSpacer: {
+    width: 44,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  gridHint: {
+    marginBottom: spacing.sm,
+  },
+  slot: {
+    width: '31.5%',
+    aspectRatio: 0.78,
+    borderRadius: radii.sm,
+    overflow: 'hidden',
+    backgroundColor: colors.pinkTint,
+  },
+
+  slotImage: {
+    width: '100%',
+    height: '100%',
+  },
+  slotEmpty: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.pinkBorder,
+    borderStyle: 'dashed',
+    borderRadius: radii.sm,
+  },
+  slotBadge: {
+    position: 'absolute',
+    left: 6,
+    bottom: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radii.pill,
+    backgroundColor: 'rgba(8,52,63,0.75)',
+  },
+  slotBadgeText: {
+    fontSize: 11,
+  },
+  pills: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
   },
-  prompt: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
+  promptPreview: {
+    gap: 4,
+  },
+  footerNote: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
+    paddingHorizontal: layout.screenPadding > 0 ? 0 : 0,
   },
 });

@@ -11,8 +11,7 @@ export function formatHeight(cm: number, imperial = usesImperial()) {
   return `${Math.floor(totalInches / 12)}′ ${totalInches % 12}″`;
 }
 
-const KM_PER_MILE = 1.609344;
-
-export function formatDistance(km: number, imperial = usesImperial()) {
-  return imperial ? `${Math.round(km / KM_PER_MILE)} mi` : `${Math.round(km)} km`;
+/** Always kilometres — VOYC is India-first; don’t follow the device’s imperial setting. */
+export function formatDistance(km: number) {
+  return `${Math.round(km)} km`;
 }

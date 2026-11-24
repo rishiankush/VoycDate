@@ -93,9 +93,17 @@ export function DiscoveryProvider({ children }: { children: ReactNode }) {
             router.push('/match');
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           decided.current.delete(card.uid);
           setCards((prev) => [card, ...prev.filter((c) => c.uid !== card.uid)]);
+          const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+          if (code === 'functions/resource-exhausted' && action === 'like') {
+            Alert.alert('Out of likes for today', 'Upgrade to Premium for unlimited likes.', [
+              { text: 'Not now', style: 'cancel' },
+              { text: 'Upgrade', onPress: () => router.push('/paywall') },
+            ]);
+            return;
+          }
           Alert.alert('Couldn’t save that', 'Check your connection and try again.');
         });
     },

@@ -107,6 +107,7 @@ export const deleteAccount = onCall({ timeoutSeconds: 120, memory: '512MiB' }, a
   await deleteSubcollection(`swipes/${uid}`, 'outgoing');
   await deleteSubcollection(`blocks/${uid}`, 'blocked');
   await deleteSubcollection(`likesReceived/${uid}`, 'from');
+  await deleteSubcollection(`users/${uid}`, 'inbox');
   await deleteQuery('reports', 'reporterId', uid);
 
   await Promise.all([

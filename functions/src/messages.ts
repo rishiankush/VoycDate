@@ -1,8 +1,10 @@
 import { FieldValue, type DocumentData } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { logger } from 'firebase-functions';
 
 import { annotateImages, isUnsafe } from './moderation/vision';
+import { clock, notifyUser, notifyUsers } from './push';
 import { db, requireUid } from './shared';
 
 export const VOICE_MIN_MS = 3_000;
@@ -41,12 +43,12 @@ export const sendVoiceMessage = onCall(async (request) => {
   const matchRef = firestore.doc(`matches/${matchId}`);
   const messageRef = matchRef.collection('messages').doc(messageId);
 
-  return firestore.runTransaction(async (tx) => {
+  const result = await firestore.runTransaction(async (tx) => {
     const [matchSnap, existing] = await tx.getAll(matchRef, messageRef);
     const match = requireActiveMember(matchSnap.data(), uid);
-    if (existing.exists) return { ok: true, duplicate: true };
+    if (existing.exists) return { ok: true as const, duplicate: true as const };
 
-    const other = match.members.find((m: string) => m !== uid);
+    const other = match.members.find((m: string) => m !== uid) as string;
     if (match.stage === 'awaiting_first_voice') {
       if (match.firstSenderId !== uid) {
         throw new HttpsError('failed-precondition', 'Your match sends the first voice note.');
@@ -97,8 +99,39 @@ export const sendVoiceMessage = onCall(async (request) => {
       [`unread.${other}`]: FieldValue.increment(1),
     });
 
-    return { ok: true, stage, counts };
+    const senderName = match.people?.[uid]?.firstName ?? 'Someone';
+    return {
+      ok: true as const,
+      duplicate: false as const,
+      stage,
+      counts,
+      other,
+      senderName,
+      members: match.members as string[],
+      enteredDeciding: stage === 'deciding' && match.stage !== 'deciding',
+      durationMs: Math.round(durationMs),
+    };
   });
+
+  if (!result.duplicate && result.other) {
+    await notifyUser(result.other, {
+      kind: 'voiceMessage',
+      title: result.senderName!,
+      body: `${result.senderName} sent you a voice note (${clock(result.durationMs!)})`,
+      data: { type: 'message', matchId },
+    }).catch((error) => logger.warn('voice push failed', error));
+
+    if (result.enteredDeciding) {
+      await notifyUsers(result.members!, {
+        kind: 'unlock',
+        title: 'Ready to unlock text?',
+        body: 'You’ve exchanged enough voice notes. Decide together to unlock text chat.',
+        data: { type: 'unlock', matchId },
+      }).catch((error) => logger.warn('unlock-ready push failed', error));
+    }
+  }
+
+  return { ok: true, stage: result.stage, counts: result.counts, duplicate: result.duplicate };
 });
 
 export const submitUnlockDecision = onCall(async (request) => {
@@ -112,7 +145,7 @@ export const submitUnlockDecision = onCall(async (request) => {
   const firestore = db();
   const matchRef = firestore.doc(`matches/${matchId}`);
 
-  return firestore.runTransaction(async (tx) => {
+  const result = await firestore.runTransaction(async (tx) => {
     const snap = await tx.get(matchRef);
     const match = requireActiveMember(snap.data(), uid);
     if (match.stage !== 'deciding') {
@@ -120,19 +153,21 @@ export const submitUnlockDecision = onCall(async (request) => {
     }
 
     const votes: Record<string, UnlockVote> = { ...(match.unlock?.votes ?? {}) };
-    if (votes[uid]) return { ok: true, stage: match.stage, alreadyVoted: true };
+    if (votes[uid]) return { ok: true as const, stage: match.stage, alreadyVoted: true as const };
     votes[uid] = decision;
 
     const other = match.members.find((m: string) => m !== uid) as string;
     const myVote = votes[uid];
     const theirVote = votes[other];
+    const otherName = match.people?.[other]?.firstName ?? 'Your match';
+    const members = match.members as string[];
 
     if (!theirVote) {
       tx.update(matchRef, {
         'unlock.votes': votes,
         updatedAt: FieldValue.serverTimestamp(),
       });
-      return { ok: true, stage: 'deciding', waiting: true };
+      return { ok: true as const, stage: 'deciding' as const, waiting: true as const, other, otherName };
     }
 
     const bothYes = myVote === 'yes' && theirVote === 'yes';
@@ -144,7 +179,7 @@ export const submitUnlockDecision = onCall(async (request) => {
         'unlock.nextPromptAtCount': FieldValue.delete(),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      return { ok: true, stage: 'text_unlocked' };
+      return { ok: true as const, stage: 'text_unlocked' as const, members, otherName };
     }
 
     const qualifiedCount = match.voice?.qualifiedCount ?? 0;
@@ -155,8 +190,19 @@ export const submitUnlockDecision = onCall(async (request) => {
       'unlock.nextPromptAtCount': qualifiedCount + REPROMPT_EVERY,
       updatedAt: FieldValue.serverTimestamp(),
     });
-    return { ok: true, stage: 'voice', keepVoice: true };
+    return { ok: true as const, stage: 'voice' as const, keepVoice: true as const };
   });
+
+  if (result.stage === 'text_unlocked' && result.members) {
+    await notifyUsers(result.members, {
+      kind: 'unlock',
+      title: 'Text chat unlocked',
+      body: 'It’s mutual! Text chat is now open.',
+      data: { type: 'unlock', matchId },
+    }).catch((error) => logger.warn('text-unlocked push failed', error));
+  }
+
+  return result;
 });
 
 export const sendTextMessage = onCall(async (request) => {
@@ -175,15 +221,15 @@ export const sendTextMessage = onCall(async (request) => {
   const matchRef = firestore.doc(`matches/${matchId}`);
   const messageRef = matchRef.collection('messages').doc(messageId);
 
-  return firestore.runTransaction(async (tx) => {
+  const result = await firestore.runTransaction(async (tx) => {
     const [matchSnap, existing] = await tx.getAll(matchRef, messageRef);
     const match = requireActiveMember(matchSnap.data(), uid);
-    if (existing.exists) return { ok: true, duplicate: true };
+    if (existing.exists) return { ok: true as const, duplicate: true as const };
     if (match.stage !== 'text_unlocked') {
       throw new HttpsError('failed-precondition', 'Text chat is still locked.');
     }
 
-    const other = match.members.find((m: string) => m !== uid);
+    const other = match.members.find((m: string) => m !== uid) as string;
     tx.set(messageRef, {
       senderId: uid,
       type: 'text',
@@ -195,8 +241,25 @@ export const sendTextMessage = onCall(async (request) => {
       lastMessageAt: FieldValue.serverTimestamp(),
       [`unread.${other}`]: FieldValue.increment(1),
     });
-    return { ok: true };
+    return {
+      ok: true as const,
+      duplicate: false as const,
+      other,
+      senderName: match.people?.[uid]?.firstName ?? 'Someone',
+      preview: trimmed.slice(0, 80),
+    };
   });
+
+  if (!result.duplicate && result.other) {
+    await notifyUser(result.other, {
+      kind: 'textPhoto',
+      title: result.senderName!,
+      body: result.preview!,
+      data: { type: 'message', matchId },
+    }).catch((error) => logger.warn('text push failed', error));
+  }
+
+  return { ok: true, duplicate: result.duplicate };
 });
 
 export const sendPhotoMessage = onCall(
@@ -236,7 +299,8 @@ export const sendPhotoMessage = onCall(
       throw new HttpsError('internal', 'We couldn’t check that photo. Please try again.');
     }
 
-    const other = match.members.find((m: string) => m !== uid);
+    const other = match.members.find((m: string) => m !== uid) as string;
+    const senderName = match.people?.[uid]?.firstName ?? 'Someone';
     await messageRef.set({
       senderId: uid,
       type: 'photo',
@@ -251,6 +315,14 @@ export const sendPhotoMessage = onCall(
       lastMessageAt: FieldValue.serverTimestamp(),
       [`unread.${other}`]: FieldValue.increment(1),
     });
+
+    await notifyUser(other, {
+      kind: 'textPhoto',
+      title: senderName,
+      body: `${senderName} sent you a photo`,
+      data: { type: 'message', matchId },
+    }).catch((error) => logger.warn('photo push failed', error));
+
     return { ok: true };
   },
 );

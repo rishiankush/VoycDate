@@ -28,3 +28,4 @@ export { checkVideoIntro, moderateProfileMedia } from './moderation';
 export { transcribeVoiceMessage } from './transcription';
 export { unmatch, blockUser, unblockUser, reportUser, listBlockedUsers } from './safety';
 export { requestDataExport, deleteAccount } from './account';
+export { getLikesTab, setPremiumStatus } from './premium';

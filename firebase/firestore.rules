@@ -29,12 +29,22 @@ service cloud.firestore {
         && request.resource.data.onboarding.status == 'in_progress'
         && request.resource.data.createdAt == request.time;
 
-      // Account status, phone number and creation time are server-managed after creation.
+      // Account status, phone number, premium and like quota are server-managed after creation.
       allow update: if isOwner(userId)
         && unchanged('status')
         && unchanged('phoneNumber')
         && unchanged('createdAt')
-        && lockedOnceSet('birthDate');
+        && lockedOnceSet('birthDate')
+        && (!('premium' in request.resource.data) || unchanged('premium'))
+        && (!('likesQuota' in request.resource.data) || unchanged('likesQuota'));
+
+      // Push inbox rows are written by Cloud Functions; the owner can read and mark as read.
+      match /inbox/{notificationId} {
+        allow read: if isOwner(userId);
+        allow update: if isOwner(userId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+        allow create, delete: if false;
+      }
     }
 
     // Only the moderation function may approve a video, set its poster/transcript or record moderation results.
