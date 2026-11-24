@@ -7,7 +7,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/ui';
 import { colors, radii, spacing } from '@/theme';
 
-import { intentLabel, placeLine } from './labels';
+import { intentLabel, nameAgeLine, placeLine } from './labels';
 import { PhotoGradient } from './PhotoGradient';
 import type { DiscoverCard, SwipeAction } from './types';
 
@@ -121,12 +121,12 @@ export function VideoFeedItem({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${card.firstName}, ${card.age}. ${placeLine(card)}. View profile`}
+        accessibilityLabel={`${nameAgeLine(card)}. ${placeLine(card)}. View profile`}
         onPress={onOpenProfile}
         style={styles.info}>
         <View style={styles.nameRow}>
           <AppText variant="title" color="white">
-            {card.firstName}, {card.age}
+            {nameAgeLine(card)}
           </AppText>
           {card.verified ? <BadgeCheck size={24} color={colors.white} fill={colors.pink} /> : null}
           <ChevronRight size={22} color={colors.white} />

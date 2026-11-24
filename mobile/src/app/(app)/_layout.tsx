@@ -16,6 +16,10 @@ function AppShell() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="person/[uid]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="filters" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="preview-profile" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="blocked" options={{ presentation: 'modal' }} />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="match" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
       </Stack>

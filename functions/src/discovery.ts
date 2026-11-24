@@ -43,8 +43,13 @@ function changed(change: Change<DocumentSnapshot> | undefined, pick: (data: Docu
 }
 
 const userFields = (u: DocumentData) => [u.status, u.onboarding?.status, u.paused ?? false, u.birthDate ?? null];
-const prefFields = (p: DocumentData) => [p.showMe, p.ageRange, p.maxDistanceKm];
+const prefFields = (p: DocumentData) => [p.showMe, p.ageRange, p.maxDistanceKm, p.showAge, p.showDistance];
 const profileFields = ({ updatedAt: _updatedAt, moderation: _moderation, ...rest }: DocumentData) => rest;
+
+async function blockedIds(uid: string) {
+  const snap = await db().collection(`blocks/${uid}/blocked`).limit(500).get();
+  return snap.docs.map((d) => d.id);
+}
 
 export const syncDiscoveryFromUser = onDocumentWritten('users/{uid}', async (event) => {
   if (changed(event.data, userFields)) await rebuildDiscovery(event.params.uid);
@@ -65,6 +70,7 @@ export const getDiscoveryFeed = onCall(async (request) => {
       : [],
   );
   exclude.add(uid);
+  for (const id of await blockedIds(uid)) exclude.add(id);
 
   let [meSnap, prefsSnap] = await firestore.getAll(firestore.doc(`discovery/${uid}`), firestore.doc(`preferences/${uid}`));
   // Accounts created before the sync triggers existed have no discovery record yet.
@@ -115,10 +121,15 @@ export const getDiscoveryFeed = onCall(async (request) => {
       if (age < myRange.min || (myRange.max < 80 && age > myRange.max)) continue;
       if (myAge < c.ageRange.min || (c.ageRange.max < 80 && myAge > c.ageRange.max)) continue;
 
-      candidates.push({ uid: doc.id, age, distanceKm: Math.max(1, Math.round(distanceKm)), ...c.card });
+      candidates.push({
+        uid: doc.id,
+        age: c.showAge === false ? null : age,
+        distanceKm: c.showDistance === false ? null : Math.max(1, Math.round(distanceKm)),
+        ...c.card,
+      });
     }
   }
-  candidates.sort((a, b) => a.distanceKm - b.distanceKm);
+  candidates.sort((a, b) => (a.distanceKm ?? Number.POSITIVE_INFINITY) - (b.distanceKm ?? Number.POSITIVE_INFINITY));
 
   // Check earlier swipes only for the shortlist, instead of reading the user's whole swipe history.
   const cards: (typeof candidates)[number][] = [];

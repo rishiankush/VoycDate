@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, ImagePlus, Info, Lock, SendHorizontal } from 'lucide-react-native';
+import { ChevronLeft, Ellipsis, ImagePlus, Info, Lock, SendHorizontal } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -34,6 +34,7 @@ import {
 import { VoiceBubble } from '@/features/chat/VoiceBubble';
 import { VoiceExchangeCard } from '@/features/chat/VoiceExchangeCard';
 import type { Match } from '@/features/matches/useMatches';
+import { SafetyActions } from '@/features/safety/SafetyActions';
 import { colors, fontFamily, layout, radii, shadows, spacing } from '@/theme';
 
 const THRESHOLD = 3;
@@ -182,6 +183,17 @@ export default function ChatScreen() {
               </AppText>
               <AppText variant="caption">{matchedLabel(match, new Date(now))}</AppText>
             </View>
+            {match.status === 'active' ? (
+              <SafetyActions targetId={otherId} targetName={other.firstName} matchId={matchId} canUnmatch>
+                {(open) => (
+                  <IconButton
+                    accessibilityLabel="Conversation options"
+                    onPress={open}
+                    icon={<Ellipsis size={22} color={colors.plum} />}
+                  />
+                )}
+              </SafetyActions>
+            ) : null}
           </View>
 
           <FlatList

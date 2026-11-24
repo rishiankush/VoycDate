@@ -24,6 +24,13 @@ const CALLABLES = [
   'submitUnlockDecision',
   'sendTextMessage',
   'sendPhotoMessage',
+  'unmatch',
+  'blockUser',
+  'unblockUser',
+  'reportUser',
+  'listBlockedUsers',
+  'requestDataExport',
+  'deleteAccount',
 ];
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 

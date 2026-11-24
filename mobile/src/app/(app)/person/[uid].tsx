@@ -1,17 +1,18 @@
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router, useLocalSearchParams } from 'expo-router';
-import { X } from 'lucide-react-native';
+import { Ellipsis, X } from 'lucide-react-native';
 import { useEffect, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, IconButton } from '@/components/ui';
 import { useDiscovery } from '@/features/discover/DiscoveryProvider';
-import { intentLabel, placeLine } from '@/features/discover/labels';
+import { intentLabel, nameAgeLine, placeLine } from '@/features/discover/labels';
 import { SwipeActions } from '@/features/discover/SwipeActions';
 import type { DiscoverCard, SwipeAction } from '@/features/discover/types';
 import { formatHeight } from '@/features/onboarding/units';
+import { SafetyActions } from '@/features/safety/SafetyActions';
 import { colors, layout, radii, spacing } from '@/theme';
 
 function basics(card: DiscoverCard) {
@@ -57,9 +58,7 @@ export default function PersonScreen() {
         {!card.video && photos[0] ? <Image source={{ uri: photos[0].url }} style={styles.hero} contentFit="cover" /> : null}
 
         <View style={styles.section}>
-          <AppText variant="title">
-            {card.firstName}, {card.age}
-          </AppText>
+          <AppText variant="title">{nameAgeLine(card)}</AppText>
           <AppText variant="body">{placeLine(card)}</AppText>
           {card.video?.transcript ? (
             <AppText variant="body" color="textMuted" style={styles.transcript}>
@@ -97,7 +96,16 @@ export default function PersonScreen() {
         ))}
       </ScrollView>
 
-      <SafeAreaView edges={['top']} style={styles.closeWrap} pointerEvents="box-none">
+      <SafeAreaView edges={['top']} style={styles.topBar} pointerEvents="box-none">
+        <SafetyActions targetId={card.uid} targetName={card.firstName}>
+          {(open) => (
+            <IconButton
+              accessibilityLabel="Report or block"
+              onPress={open}
+              icon={<Ellipsis size={20} color={colors.plum} />}
+            />
+          )}
+        </SafetyActions>
         <IconButton accessibilityLabel="Close" onPress={router.back} icon={<X size={20} color={colors.plum} />} />
       </SafeAreaView>
 
@@ -205,10 +213,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.pinkTint,
     borderColor: colors.pink,
   },
-  closeWrap: {
+  topBar: {
     position: 'absolute',
     top: 0,
+    left: spacing.sm,
     right: spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   actions: {
     position: 'absolute',

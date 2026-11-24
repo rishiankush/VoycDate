@@ -1,8 +1,8 @@
 export type DiscoverCard = {
   uid: string;
   firstName: string;
-  age: number;
-  distanceKm: number;
+  age: number | null;
+  distanceKm: number | null;
   gender: string | null;
   intent: string | null;
   heightCm: number | null;

@@ -61,6 +61,16 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
+    // Written only by Cloud Functions (blockUser / unblockUser).
+    match /blocks/{userId}/blocked/{targetId} {
+      allow read: if isOwner(userId);
+    }
+
+    // Written only by Cloud Functions; admins review in a later milestone.
+    match /reports/{reportId} {
+      allow read, write: if false;
+    }
+
     // Written only by Cloud Functions.
     match /matches/{matchId} {
       allow read: if signedIn() && request.auth.uid in resource.data.members;

@@ -60,6 +60,8 @@ export function buildDiscoveryDoc(uid: string, user: DocumentData, profile: Docu
     showMe: prefs.showMe ?? 'everyone',
     ageRange: prefs.ageRange ?? DEFAULT_AGE_RANGE,
     maxDistanceKm: prefs.maxDistanceKm ?? DEFAULT_DISTANCE_KM,
+    showAge: prefs.showAge !== false,
+    showDistance: prefs.showDistance !== false,
     birthDate: user.birthDate ?? null,
     card: publicCard(profile),
   };

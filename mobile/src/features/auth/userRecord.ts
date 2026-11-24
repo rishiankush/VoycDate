@@ -19,6 +19,8 @@ export type UserRecord = {
   };
   birthDate?: string;
   email?: string;
+  /** Hidden from Discover while keeping existing matches. */
+  paused?: boolean;
   notificationsPermission?: 'granted' | 'denied' | 'undetermined';
   communityPromiseAcceptedAt?: Timestamp | null;
   createdAt: Timestamp | null;

@@ -7,8 +7,13 @@ export const intentLabel = (intent: string | null) => INTENTS.find((i) => i.valu
 
 export function placeLine(card: Pick<DiscoverCard, 'city' | 'region' | 'countryCode' | 'distanceKm'>) {
   const place = [card.city, card.countryCode === 'US' ? card.region : null].filter(Boolean).join(', ');
-  const distance = `${formatDistance(card.distanceKm)} away`;
-  return place ? `${place} · ${distance}` : distance;
+  const distance = card.distanceKm != null ? `${formatDistance(card.distanceKm)} away` : null;
+  if (place && distance) return `${place} · ${distance}`;
+  return place || distance || '';
+}
+
+export function nameAgeLine(card: Pick<DiscoverCard, 'firstName' | 'age'>) {
+  return card.age != null ? `${card.firstName}, ${card.age}` : card.firstName;
 }
 
 export function clock(ms: number) {

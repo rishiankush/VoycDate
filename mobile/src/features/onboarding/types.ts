@@ -67,4 +67,8 @@ export type Preferences = {
   showMe?: ShowMe;
   ageRange?: { min: number; max: number };
   maxDistanceKm?: number;
+  /** When false, others don’t see your age on Discover. */
+  showAge?: boolean;
+  /** When false, others don’t see how far away you are. */
+  showDistance?: boolean;
 };
