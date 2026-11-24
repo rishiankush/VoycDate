@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /profiles/{userId}/photos/{photoId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /profiles/{userId}/video/{fileName} {
+      allow read, delete: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && request.resource.size < 25 * 1024 * 1024
+        && request.resource.contentType.matches('video/.*');
+    }
+
+    match /profiles/{userId}/voice/{fileName} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('audio/.*');
+    }
+
+    // Membership is checked by sendVoiceMessage; the recipient plays the note via its download URL.
+    match /matches/{matchId}/voice/{fileName} {
+      allow read: if request.auth != null && resource.metadata.uploaderId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.metadata.uploaderId == request.auth.uid
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('audio/.*');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

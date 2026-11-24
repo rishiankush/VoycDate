@@ -1,0 +1,19 @@
+.DS_Store
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+emulator-data/
+
+# Cloud Functions
+functions/node_modules/
+functions/lib/
+functions/.env.local
+functions/*.local
+
+docs/

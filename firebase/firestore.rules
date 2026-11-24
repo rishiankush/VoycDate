@@ -1,0 +1,78 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function unchanged(field) {
+      return request.resource.data.get(field, null) == resource.data.get(field, null);
+    }
+
+    // Once set, the field cannot be changed by the client.
+    function lockedOnceSet(field) {
+      return resource.data.get(field, null) == null || unchanged(field);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(['phoneNumber', 'status', 'onboarding', 'createdAt', 'updatedAt'])
+        && request.resource.data.phoneNumber == request.auth.token.phone_number
+        && request.resource.data.status == 'active'
+        && request.resource.data.onboarding.status == 'in_progress'
+        && request.resource.data.createdAt == request.time;
+
+      // Account status, phone number and creation time are server-managed after creation.
+      allow update: if isOwner(userId)
+        && unchanged('status')
+        && unchanged('phoneNumber')
+        && unchanged('createdAt')
+        && lockedOnceSet('birthDate');
+    }
+
+    // Only the moderation function may approve a video, set its poster/transcript or record moderation results.
+    function clientVideoIntro(video) {
+      return video == null || (
+        video.status == 'pending'
+        && !video.keys().hasAny(['posterUrl', 'posterPath', 'rejectionReason', 'transcript', 'checks', 'checkedAt'])
+      );
+    }
+
+    match /profiles/{userId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId)
+        && clientVideoIntro(request.resource.data.get('videoIntro', null))
+        && !('moderation' in request.resource.data);
+
+      allow update: if isOwner(userId)
+        && unchanged('moderation')
+        && (unchanged('videoIntro') || clientVideoIntro(request.resource.data.get('videoIntro', null)));
+    }
+
+    match /preferences/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Written only by Cloud Functions.
+    match /matches/{matchId} {
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+
+      match /messages/{messageId} {
+        allow read: if signedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/matches/$(matchId)).data.members;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
