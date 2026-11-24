@@ -1,10 +1,19 @@
+import { httpsCallable } from 'firebase/functions';
 import { serverTimestamp, updateDoc } from 'firebase/firestore';
 
 import { profileDoc } from '@/features/onboarding/OnboardingProvider';
 import type { VideoIntro } from '@/features/onboarding/types';
+import { functions } from '@/lib/firebase';
 import { deleteFile, uploadFile } from '@/lib/upload';
 
 const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+const checkVideoIntro = httpsCallable(functions, 'checkVideoIntro');
+
+/** Asks the backend to finish face/content checks for a pending intro. */
+export async function requestVideoCheck() {
+  await checkVideoIntro({});
+}
 
 /**
  * Uploads a recorded intro and submits it for the automatic face and content check. The whole field is
@@ -31,10 +40,13 @@ export async function submitVideoIntro(
 
   if (previous?.path && previous.path !== path) deleteFile(previous.path);
   if (previous?.posterPath) deleteFile(previous.posterPath);
+
+  // Callable path — Eventarc Firestore triggers can lag on a fresh project.
+  await requestVideoCheck();
 }
 
 /** Re-submits the same video for checking after a temporary check failure or a stuck pending state. */
-export function retryVideoCheck(uid: string, video: VideoIntro) {
+export async function retryVideoCheck(uid: string, video: VideoIntro) {
   const videoIntro: VideoIntro = {
     path: video.path,
     url: video.url,
@@ -43,5 +55,6 @@ export function retryVideoCheck(uid: string, video: VideoIntro) {
     // Forces the moderation trigger to run even when the file path is unchanged.
     checkNonce: Date.now(),
   };
-  return updateDoc(profileDoc(uid), { videoIntro, updatedAt: serverTimestamp() });
+  await updateDoc(profileDoc(uid), { videoIntro, updatedAt: serverTimestamp() });
+  await requestVideoCheck();
 }

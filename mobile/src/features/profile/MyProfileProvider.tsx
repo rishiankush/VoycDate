@@ -3,13 +3,14 @@ import { createContext, use, useCallback, useEffect, useMemo, useState, type Rea
 
 import { useSession } from '@/features/auth/SessionProvider';
 import { preferencesDoc, profileDoc } from '@/features/onboarding/OnboardingProvider';
-import type { Preferences, Profile } from '@/features/onboarding/types';
+import type { Preferences, Profile, ProfileLocation } from '@/features/onboarding/types';
 
 type MyProfileValue = {
   uid: string;
   profile: Profile;
   preferences: Preferences;
   savePreferences: (fields: Partial<Preferences>) => Promise<void>;
+  saveLocation: (location: ProfileLocation) => Promise<void>;
 };
 
 const MyProfileContext = createContext<MyProfileValue | null>(null);
@@ -38,14 +39,21 @@ export function MyProfileProvider({ children }: { children: ReactNode }) {
     [uid],
   );
 
+  const saveLocation = useCallback(
+    (location: ProfileLocation) =>
+      setDoc(profileDoc(uid), { location, updatedAt: serverTimestamp() }, { merge: true }),
+    [uid],
+  );
+
   const value = useMemo(
     () => ({
       uid,
       profile: profile?.uid === uid ? profile.data : {},
       preferences: preferences?.uid === uid ? preferences.data : {},
       savePreferences,
+      saveLocation,
     }),
-    [uid, profile, preferences, savePreferences],
+    [uid, profile, preferences, savePreferences, saveLocation],
   );
 
   return <MyProfileContext value={value}>{children}</MyProfileContext>;

@@ -1,10 +1,10 @@
 import * as Location from 'expo-location';
-import { geohashForLocation } from 'geofire-common';
 import { LocateFixed, MapPin } from 'lucide-react-native';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText, Button, Slider, TextField } from '@/components/ui';
+import { placeLabel, readDeviceLocation, toProfileLocation } from '@/features/location/deviceLocation';
 import { DISTANCE_DEFAULT_KM, DISTANCE_MAX_KM, DISTANCE_MIN_KM } from '@/features/onboarding/options';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 import { OnboardingScreen } from '@/features/onboarding/OnboardingScreen';
@@ -14,34 +14,6 @@ import { useOnboardingStep } from '@/features/onboarding/useOnboardingStep';
 import { colors, radii, shadows, spacing } from '@/theme';
 
 const STEP = '5.1';
-
-// Two decimal places is roughly 1 km, so the stored point never pinpoints where someone lives.
-const coarse = (n: number) => Math.round(n * 100) / 100;
-
-function toProfileLocation(
-  coords: { latitude: number; longitude: number },
-  place: Location.LocationGeocodedAddress | undefined,
-  source: ProfileLocation['source'],
-  fallbackCity = '',
-): ProfileLocation {
-  const lat = coarse(coords.latitude);
-  const lng = coarse(coords.longitude);
-  return {
-    city: place?.city ?? place?.subregion ?? place?.district ?? place?.region ?? fallbackCity,
-    region: place?.region ?? null,
-    country: place?.country ?? null,
-    countryCode: place?.isoCountryCode ?? null,
-    geohash: geohashForLocation([lat, lng]),
-    lat,
-    lng,
-    source,
-  };
-}
-
-function placeLabel(location: ProfileLocation) {
-  const tail = location.countryCode === 'US' ? location.region : location.country;
-  return [location.city, tail].filter(Boolean).join(', ');
-}
 
 export default function LocationStep() {
   const { profile, preferences } = useOnboarding();
@@ -55,19 +27,12 @@ export default function LocationStep() {
 
   const locateDevice = async () => {
     setError(undefined);
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (!permission.granted) {
-      setDenied(true);
-      return;
-    }
     setLocating(true);
     try {
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const [place] = await Location.reverseGeocodeAsync(position.coords);
-      setLocation(toProfileLocation(position.coords, place, 'device'));
+      setLocation(await readDeviceLocation());
     } catch {
-      setError('We couldn’t get your location. Try again or enter your city.');
       setDenied(true);
+      setError('We couldn’t get your location. Try again or enter your city.');
     } finally {
       setLocating(false);
     }
@@ -131,7 +96,7 @@ export default function LocationStep() {
         <View style={styles.manual}>
           <TextField
             label="Or enter your city"
-            placeholder="e.g. Austin, TX"
+            placeholder="e.g. Mohali, India"
             value={query}
             onChangeText={setQuery}
             autoCapitalize="words"

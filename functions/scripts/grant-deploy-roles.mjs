@@ -13,10 +13,12 @@ import { fileURLToPath } from 'node:url';
 import { GoogleAuth } from 'google-auth-library';
 
 const PROJECT_ID = 'voyc-date';
-const PROJECT_NUMBER = '543361386420';
+const PROJECT_NUMBER = '605017798103';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-const compute = `serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com`;
+const computeEmail = `${PROJECT_NUMBER}-compute@developer.gserviceaccount.com`;
+const compute = `serviceAccount:${computeEmail}`;
+const adminsdk = `serviceAccount:firebase-adminsdk-fbsvc@${PROJECT_ID}.iam.gserviceaccount.com`;
 const REQUIRED = [
   [compute, 'roles/cloudbuild.builds.builder'],
   [compute, 'roles/run.invoker'],
@@ -28,26 +30,56 @@ const REQUIRED = [
   [compute, 'roles/logging.logWriter'],
   // Lets the functions call Cloud Vision (face and explicit-content checks) on this project's quota.
   [compute, 'roles/serviceusage.serviceUsageConsumer'],
+  [adminsdk, 'roles/datastore.user'],
+  [adminsdk, 'roles/storage.objectAdmin'],
+  [adminsdk, 'roles/serviceusage.serviceUsageConsumer'],
   [`serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com`, 'roles/iam.serviceAccountTokenCreator'],
   [`serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-eventarc.iam.gserviceaccount.com`, 'roles/eventarc.serviceAgent'],
+  [`serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-eventarc.iam.gserviceaccount.com`, 'roles/eventarc.eventReceiver'],
 ];
 
 const globalRoot = execSync('npm root -g').toString().trim();
 const req = createRequire(join(globalRoot, 'firebase-tools', 'package.json'));
 const account = req('./lib/auth.js').getProjectDefaultAccount(repoRoot);
 const creds = JSON.parse(readFileSync(await req('./lib/defaultCredentials.js').getCredentialPathAsync(account), 'utf8'));
-const keyFile = join(tmpdir(), `tung-iam-${process.pid}.json`);
+const keyFile = join(tmpdir(), `voyc-iam-${process.pid}.json`);
 writeFileSync(keyFile, JSON.stringify({ ...creds, quota_project_id: PROJECT_ID }));
 
 const client = await new GoogleAuth({ keyFile, scopes: ['https://www.googleapis.com/auth/cloud-platform'] }).getClient();
 const base = `https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT_ID}`;
 
-for (const service of ['vision.googleapis.com']) {
+for (const service of [
+  'vision.googleapis.com',
+  'compute.googleapis.com',
+  'eventarc.googleapis.com',
+  'run.googleapis.com',
+  'cloudfunctions.googleapis.com',
+  'artifactregistry.googleapis.com',
+  'cloudbuild.googleapis.com',
+]) {
   await client.request({
     url: `https://serviceusage.googleapis.com/v1/projects/${PROJECT_ID}/services/${service}:enable`,
     method: 'POST',
   });
   console.log(`  enabled:     ${service}`);
+}
+
+try {
+  await client.request({
+    url: `https://iam.googleapis.com/v1/projects/${PROJECT_ID}/serviceAccounts/${computeEmail}`,
+    method: 'GET',
+  });
+  console.log(`  exists:      ${computeEmail}`);
+} catch {
+  await client.request({
+    url: `https://iam.googleapis.com/v1/projects/${PROJECT_ID}/serviceAccounts`,
+    method: 'POST',
+    data: {
+      accountId: `${PROJECT_NUMBER}-compute`,
+      serviceAccount: { displayName: 'Compute Engine default service account' },
+    },
+  });
+  console.log(`  created:     ${computeEmail}`);
 }
 
 const { data: policy } = await client.request({

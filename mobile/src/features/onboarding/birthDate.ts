@@ -1,15 +1,15 @@
-/** Inserts slashes as the user types digits: "03151997" becomes "03/15/1997". */
+/** Inserts slashes as the user types digits: "15031997" becomes "15/03/1997". */
 export function formatBirthDateInput(text: string) {
   const digits = text.replace(/\D/g, '').slice(0, 8);
   const parts = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 8)].filter(Boolean);
   return parts.join('/');
 }
 
-/** Returns an ISO date (YYYY-MM-DD) for a complete, real MM/DD/YYYY input, otherwise null. */
+/** Returns an ISO date (YYYY-MM-DD) for a complete, real DD/MM/YYYY input, otherwise null. */
 export function parseBirthDateInput(input: string) {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(input);
   if (!match) return null;
-  const [, mm, dd, yyyy] = match;
+  const [, dd, mm, yyyy] = match;
   const day = Number(dd);
   const month = Number(mm);
   const year = Number(yyyy);
@@ -21,7 +21,7 @@ export function parseBirthDateInput(input: string) {
 
 export function toDisplayBirthDate(iso: string) {
   const [yyyy, mm, dd] = iso.split('-');
-  return `${mm}/${dd}/${yyyy}`;
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 export function ageFromBirthDate(iso: string, today = new Date()) {

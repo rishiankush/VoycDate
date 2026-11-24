@@ -16,7 +16,7 @@ const MESSAGES: Record<string, string> = {
 export function authErrorMessage(error: unknown) {
   const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
   const message = error instanceof Error ? error.message : '';
-  if (code === 'auth/operation-not-allowed' && message.includes('region')) {
+  if (code === 'auth/operation-not-allowed' && /region/i.test(message)) {
     return 'We can’t send codes to numbers in your country yet. Please try again later.';
   }
   return MESSAGES[code] ?? 'Something went wrong. Please try again.';

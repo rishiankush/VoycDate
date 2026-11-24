@@ -9,7 +9,7 @@ import { VIDEO_MAX_SECONDS, VIDEO_MIN_SECONDS } from '@/features/onboarding/opti
 import type { VideoIntro } from '@/features/onboarding/types';
 import { colors, fontFamily, radii, spacing } from '@/theme';
 
-import { retryVideoCheck, submitVideoIntro } from './videoIntro';
+import { requestVideoCheck, retryVideoCheck, submitVideoIntro } from './videoIntro';
 
 // 720p at ~1.2 Mbit/s keeps a 10-second intro around 1.5 MB on every phone, so no server transcoding is needed.
 const VIDEO_BITRATE = 1_200_000;
@@ -256,6 +256,8 @@ function CheckStatus({
       setCanRetryPending(false);
       return;
     }
+    // Kick the callable check immediately for uploads that predate a working trigger.
+    void requestVideoCheck().catch((error) => console.warn('Video check request failed', error));
     const timer = setTimeout(() => setCanRetryPending(true), 20_000);
     return () => clearTimeout(timer);
   }, [videoIntro?.status, videoIntro?.path, videoIntro?.checkNonce]);

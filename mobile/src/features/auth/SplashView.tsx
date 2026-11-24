@@ -13,7 +13,7 @@ export function SplashView() {
         VOYC
       </AppText>
       <AppText variant="eyebrow" color="onDarkMuted" style={styles.tagline}>
-        Talk. Understand. Nurture. Grow.
+        Video. Openness. You. Connection.
       </AppText>
     </View>
   );

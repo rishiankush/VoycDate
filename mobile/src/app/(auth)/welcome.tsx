@@ -23,10 +23,10 @@ export default function WelcomeScreen() {
       }>
       <OrbitIllustration />
       <View style={styles.copy}>
-        <AppText variant="eyebrow">Talk. Understand. Nurture. Grow.</AppText>
-        <AppText variant="display">{'Hear the spark.\nFeel the connection.'}</AppText>
+        <AppText variant="eyebrow">Video. Openness. You. Connection.</AppText>
+        <AppText variant="display">{'See the person.\nFeel the spark.'}</AppText>
         <AppText variant="bodyLarge">
-          Meet through short voice notes. Unlock text chat only when you both feel it.
+          Meet through short video intros. Unlock text chat only when you both feel it.
         </AppText>
       </View>
     </Screen>

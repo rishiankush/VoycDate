@@ -2,11 +2,11 @@ import { FieldValue, type DocumentData, type DocumentReference } from 'firebase-
 import { getStorage } from 'firebase-admin/storage';
 import { logger } from 'firebase-functions';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
+import { onCall } from 'firebase-functions/v2/https';
 
-import { db } from './shared';
+import { db, requireUid } from './shared';
 import { deleteQuietly, FRAME_WIDTH, processVideo, uploadWithDownloadUrl } from './moderation/media';
 import { annotateImages, hasClearFace, isUnsafe } from './moderation/vision';
-import { GROQ_API_KEY } from './secrets';
 import { transcribe } from './transcription/groq';
 
 const MIN_FACE_FRAMES = 2;
@@ -32,13 +32,16 @@ async function checkVideo(ref: DocumentReference, video: VideoIntro) {
   );
 
   let transcript: string | null = null;
-  if (audio) {
+  const groqKey = process.env.GROQ_API_KEY;
+  if (audio && groqKey) {
     try {
-      transcript = (await transcribe(audio, 'intro.m4a', 'audio/mp4', GROQ_API_KEY.value())).text;
+      transcript = (await transcribe(audio, 'intro.m4a', 'audio/mp4', groqKey)).text;
     } catch (error) {
       // A transcription outage shouldn't block a genuine user, so the speech check is skipped instead.
       logger.warn('Intro transcription unavailable', { error: String(error) });
     }
+  } else if (audio && !groqKey) {
+    logger.warn('GROQ_API_KEY not set; skipping intro speech check');
   }
 
   const unsafe = annotations.some((a) => isUnsafe(a.safeSearchAnnotation));
@@ -113,8 +116,31 @@ async function checkPhotos(ref: DocumentReference, photos: DocumentData[]) {
   if (rejected.length) logger.info('Photos removed by moderation', { profile: ref.path, count: rejected.length });
 }
 
+async function runPendingVideoCheck(uid: string) {
+  const ref = db().doc(`profiles/${uid}`);
+  const snap = await ref.get();
+  const video = snap.data()?.videoIntro as VideoIntro | undefined;
+  if (!snap.exists || video?.status !== 'pending' || !video.path) {
+    return { status: video?.status ?? null };
+  }
+  try {
+    await checkVideo(ref, video);
+  } catch (error) {
+    logger.error('Video intro check failed', { uid, error: String(error) });
+    await ref.update({ 'videoIntro.status': 'error', 'videoIntro.rejectionReason': REASONS.error });
+  }
+  const latest = (await ref.get()).data()?.videoIntro as VideoIntro | undefined;
+  return { status: latest?.status ?? null };
+}
+
+/** Client-invoked check so onboarding does not depend only on Eventarc Firestore triggers. */
+export const checkVideoIntro = onCall({ memory: '1GiB', timeoutSeconds: 120 }, async (request) => {
+  const uid = requireUid(request);
+  return runPendingVideoCheck(uid);
+});
+
 export const moderateProfileMedia = onDocumentWritten(
-  { document: 'profiles/{uid}', secrets: [GROQ_API_KEY], memory: '1GiB', timeoutSeconds: 120 },
+  { document: 'profiles/{uid}', memory: '1GiB', timeoutSeconds: 120 },
   async (event) => {
     const after = event.data?.after;
     const data = after?.data();

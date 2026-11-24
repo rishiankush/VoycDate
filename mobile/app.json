@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "VOYC Date",
+    "name": "VOYC",
     "slug": "voyc-date",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "voyc",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#FFFFFF",
+    "backgroundColor": "#0F4C5C",
     "ios": {
       "bundleIdentifier": "com.voyc.date",
       "supportsTablet": false,

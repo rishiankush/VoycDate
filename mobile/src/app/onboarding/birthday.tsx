@@ -21,7 +21,7 @@ export default function BirthdayStep() {
   const tooYoung = age !== null && age < AGE_MIN;
   const error =
     input.length === 10 && !isoDate
-      ? 'Enter a real date as MM/DD/YYYY.'
+      ? 'Enter a real date as DD/MM/YYYY.'
       : tooYoung
         ? `You must be ${AGE_MIN} or older to use VOYC.`
         : undefined;
@@ -49,7 +49,7 @@ export default function BirthdayStep() {
       busy={saving}>
       <TextField
         label="Birthday"
-        placeholder="MM/DD/YYYY"
+        placeholder="DD/MM/YYYY"
         value={input}
         onChangeText={(text) => setInput(formatBirthDateInput(text))}
         keyboardType="number-pad"

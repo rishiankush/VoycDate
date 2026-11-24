@@ -40,7 +40,13 @@ export default function RootLayout() {
     if (ready) SplashScreen.hideAsync();
   }, [ready]);
 
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <GestureHandlerRootView style={styles.root}>
+        <SplashView />
+      </GestureHandlerRootView>
+    );
+  }
 
   return (
     <GestureHandlerRootView style={styles.root}>

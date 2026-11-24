@@ -14,12 +14,12 @@ const PROMISES: { icon: ReactNode; title: string; text: string }[] = [
   {
     icon: <HeartHandshake size={22} color={colors.plum} />,
     title: 'Be kind',
-    text: 'Treat everyone with respect, in every voice note and message.',
+    text: 'Treat everyone with respect, in every video, voice note, and message.',
   },
   {
     icon: <Sparkles size={22} color={colors.plum} />,
     title: 'Be real',
-    text: 'Use your own photos and your own voice. No fake profiles.',
+    text: 'Use your own photos and your own video intro. No fake profiles.',
   },
   {
     icon: <ShieldCheck size={22} color={colors.plum} />,
