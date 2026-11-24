@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { GoogleAuth } from 'google-auth-library';
 
-const PROJECT_ID = 'tung-c01e2';
+const PROJECT_ID = 'voyc-date';
 const PROJECT_NUMBER = '543361386420';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 

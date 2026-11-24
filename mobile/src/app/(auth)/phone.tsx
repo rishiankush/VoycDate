@@ -62,11 +62,11 @@ export default function PhoneScreen() {
   };
 
   return (
-    <Screen header={<ScreenHeader title="TUNG" onBack={router.back} />}>
+    <Screen header={<ScreenHeader title="VOYC" onBack={router.back} />}>
       <View style={styles.copy}>
         <AppText variant="eyebrow">Sign in or create account</AppText>
         <AppText variant="display">{'Let’s get\nyou started!'}</AppText>
-        <AppText variant="bodyLarge">Enter your phone number to continue with TUNG</AppText>
+        <AppText variant="bodyLarge">Enter your phone number to continue with VOYC</AppText>
       </View>
 
       <View style={styles.form}>

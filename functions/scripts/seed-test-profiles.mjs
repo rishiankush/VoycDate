@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Seeds realistic test profiles into the TUNG Firebase project.
+ * Seeds realistic test profiles into the VOYC Firebase project.
  *
  *   node scripts/seed-test-profiles.mjs          # create or refresh the test profiles
  *   node scripts/seed-test-profiles.mjs --clean  # remove every test profile and its files
@@ -23,8 +23,8 @@ import { geohashForLocation } from 'geofire-common';
 import discoveryDoc from '../lib/discoveryDoc.js';
 import { COMPLETED_ONBOARDING, SEED_PROFILES } from './seedProfiles.data.mjs';
 
-const PROJECT_ID = 'tung-c01e2';
-const BUCKET = 'tung-c01e2.firebasestorage.app';
+const PROJECT_ID = 'voyc-date';
+const BUCKET = 'voyc-date.firebasestorage.app';
 const SEED_PREFIX = 'seed_';
 const DEFAULT_CENTER = { lat: 37.7749, lng: -122.4194, city: 'San Francisco', region: 'California', country: 'United States', countryCode: 'US' };
 

@@ -35,7 +35,7 @@ export default function PromiseStep() {
     <OnboardingScreen
       stepId={STEP}
       title="Our community promise"
-      subtitle="TUNG works because everyone here agrees to a few simple things."
+      subtitle="VOYC works because everyone here agrees to a few simple things."
       canContinue
       onContinue={() => complete({ user: { communityPromiseAcceptedAt: serverTimestamp() } })}
       continueLabel="I agree"

@@ -81,7 +81,7 @@ export default function VerifyScreen() {
   const ss = String(cooldown % 60).padStart(2, '0');
 
   return (
-    <Screen header={<ScreenHeader title="TUNG" onBack={router.back} />}>
+    <Screen header={<ScreenHeader title="VOYC" onBack={router.back} />}>
       <View style={styles.copy}>
         <AppText variant="display">Enter your code</AppText>
         <AppText variant="bodyLarge">

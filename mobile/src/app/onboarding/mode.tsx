@@ -19,7 +19,7 @@ export default function ModeStep() {
   return (
     <OnboardingScreen
       stepId={STEP}
-      title="What brings you to TUNG?"
+      title="What brings you to VOYC?"
       subtitle="You’ll only be shown to people in the same mode. You can switch later."
       canContinue={Boolean(mode)}
       onContinue={() => mode && complete({ profile: { mode } })}

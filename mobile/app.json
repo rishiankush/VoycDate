@@ -1,26 +1,25 @@
 {
   "expo": {
-    "name": "TUNG",
-    "slug": "tung",
-    "owner": "one-black-cloud",
+    "name": "VOYC Date",
+    "slug": "voyc-date",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "tung",
+    "scheme": "voyc",
     "userInterfaceStyle": "light",
     "backgroundColor": "#FFFFFF",
     "ios": {
-      "bundleIdentifier": "com.tung.dating",
+      "bundleIdentifier": "com.voyc.date",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.tung.dating",
+      "package": "com.voyc.date",
       "allowBackup": false,
       "adaptiveIcon": {
-        "backgroundColor": "#2A0B2B",
+        "backgroundColor": "#08343F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -36,7 +35,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#471448",
+          "backgroundColor": "#0F4C5C",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 220
         }
@@ -45,28 +44,28 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "TUNG uses your microphone to record voice introductions and voice messages."
+          "microphonePermission": "VOYC uses your microphone to record voice introductions and voice messages."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "TUNG uses your photos so you can add them to your profile.",
-          "cameraPermission": "TUNG uses your camera so you can take profile photos."
+          "photosPermission": "VOYC uses your photos so you can add them to your profile.",
+          "cameraPermission": "VOYC uses your camera so you can take profile photos."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "TUNG uses your location to show you people nearby. Your exact location is never shown."
+          "locationWhenInUsePermission": "VOYC uses your location to show you people nearby. Your exact location is never shown."
         }
       ],
       "expo-notifications",
       [
         "expo-camera",
         {
-          "cameraPermission": "TUNG uses your camera to record your video introduction.",
-          "microphonePermission": "TUNG uses your microphone so people can hear you in your video introduction.",
+          "cameraPermission": "VOYC uses your camera to record your video introduction.",
+          "microphonePermission": "VOYC uses your microphone so people can hear you in your video introduction.",
           "recordAudioAndroid": true
         }
       ],
@@ -82,9 +81,6 @@
         "asyncRoutes": {
           "web": true
         }
-      },
-      "eas": {
-        "projectId": "a976eabb-d85c-4d94-90fe-99dee4fca55d"
       }
     }
   }

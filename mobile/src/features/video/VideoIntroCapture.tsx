@@ -171,7 +171,7 @@ function CameraStage({
           Allow camera and microphone
         </AppText>
         <AppText variant="body" align="center">
-          Your intro is recorded right here in the app so everyone on TUNG is real.
+          Your intro is recorded right here in the app so everyone on VOYC is real.
         </AppText>
         <Button title="Allow access" onPress={askPermissions} style={styles.stretch} />
       </View>

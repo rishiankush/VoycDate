@@ -104,7 +104,7 @@ export function RecaptchaProvider({ children }: { children: ReactNode }) {
                 <AppText variant="bodyStrong" color="plum">
                   Quick security check
                 </AppText>
-                <AppText variant="caption">This keeps TUNG free of bots.</AppText>
+                <AppText variant="caption">This keeps VOYC free of bots.</AppText>
               </View>
               <IconButton
                 accessibilityLabel="Cancel verification"

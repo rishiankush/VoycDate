@@ -13,7 +13,7 @@ import { distanceBetween } from 'geofire-common';
 
 import shared from '../lib/shared.js';
 
-const PROJECT_ID = 'tung-c01e2';
+const PROJECT_ID = 'voyc-date';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const globalRoot = execSync('npm root -g').toString().trim();

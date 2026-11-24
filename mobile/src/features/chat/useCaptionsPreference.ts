@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 
-const KEY = 'tung.captionsOn';
+const KEY = 'voyc.captionsOn';
 
 /** Remembers the chat captions switch across sessions; captions are on by default. */
 export function useCaptionsPreference() {

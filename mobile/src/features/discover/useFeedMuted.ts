@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 
-const KEY = 'tung.feedMuted';
+const KEY = 'voyc.feedMuted';
 
 /** Feed videos play with sound by default; the choice is remembered across sessions. */
 export function useFeedMuted() {

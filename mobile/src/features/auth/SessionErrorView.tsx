@@ -19,7 +19,7 @@ export function SessionErrorView({ onRetry, onSignOut }: SessionErrorViewProps) 
         </View>
       }>
       <View style={styles.body}>
-        <AppText variant="title">We can’t reach TUNG right now</AppText>
+        <AppText variant="title">We can’t reach VOYC right now</AppText>
         <AppText variant="bodyLarge">Check your internet connection and try again.</AppText>
       </View>
     </Screen>

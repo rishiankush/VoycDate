@@ -1,5 +1,5 @@
 {
-  "name": "tung-functions",
+  "name": "voyc-functions",
   "private": true,
   "main": "lib/index.js",
   "engines": {
@@ -10,7 +10,7 @@
     "build:watch": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "serve": "npm run build && firebase emulators:start --only functions",
-    "local": "npm run build && firebase emulators:start --only functions --project tung-c01e2",
+    "local": "npm run build && firebase emulators:start --only functions --project voyc-date",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "seed": "npm run build && node scripts/seed-test-profiles.mjs",

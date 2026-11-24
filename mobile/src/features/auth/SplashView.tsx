@@ -6,11 +6,11 @@ import { fontFamily, spacing } from '@/theme';
 
 export function SplashView() {
   return (
-    <View style={styles.container} accessibilityLabel="TUNG is loading">
+    <View style={styles.container} accessibilityLabel="VOYC is loading">
       <StatusBar style="light" />
       <GlowBackground variant="dark" />
       <AppText style={styles.wordmark} color="onDark">
-        TUNG
+        VOYC
       </AppText>
       <AppText variant="eyebrow" color="onDarkMuted" style={styles.tagline}>
         Talk. Understand. Nurture. Grow.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Adds a project-level exception to the organisation's "Domain restricted sharing" policies so callable
- * functions can be invoked by the app. Applies to the tung-c01e2 project only.
+ * functions can be invoked by the app. Applies to the voyc-date project only.
  */
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { GoogleAuth } from 'google-auth-library';
 
-const PROJECT_ID = 'tung-c01e2';
+const PROJECT_ID = 'voyc-date';
 const CONSTRAINTS = ['iam.allowedPolicyMemberDomains', 'iam.managed.allowedPolicyMembers'];
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 

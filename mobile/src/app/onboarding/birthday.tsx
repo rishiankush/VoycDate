@@ -23,7 +23,7 @@ export default function BirthdayStep() {
     input.length === 10 && !isoDate
       ? 'Enter a real date as MM/DD/YYYY.'
       : tooYoung
-        ? `You must be ${AGE_MIN} or older to use TUNG.`
+        ? `You must be ${AGE_MIN} or older to use VOYC.`
         : undefined;
   const valid = Boolean(isoDate) && !tooYoung && age !== null && age <= 100;
 

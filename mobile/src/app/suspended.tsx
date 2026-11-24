@@ -21,7 +21,7 @@ export default function SuspendedScreen() {
           Your account is suspended
         </AppText>
         <AppText variant="bodyLarge" color="onDarkMuted" align="center">
-          Your account has been suspended for breaking our community guidelines. Contact TUNG support if
+          Your account has been suspended for breaking our community guidelines. Contact VOYC support if
           you think this is a mistake.
         </AppText>
       </View>
