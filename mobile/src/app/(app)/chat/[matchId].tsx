@@ -63,7 +63,10 @@ function buildRows(messages: ChatMessage[], now: Date): Row[] {
   return rows;
 }
 
-function matchedLabel(match: Match, now: Date) {
+function matchedLabel(match: Match, now: Date, uid: string) {
+  if (match.stage === 'spark_pending') {
+    return match.sparkedBy === uid ? 'Spark sent · waiting for a reply' : 'Spark request · Accept in Connections';
+  }
   const created = match.createdAt?.toDate();
   const day = created ? dayLabel(created, now) : 'Today';
   const when = day === 'Today' || day === 'Yesterday' ? day.toLowerCase() : `on ${day}`;
@@ -154,9 +157,10 @@ export default function ChatScreen() {
   const otherId = match.members.find((m) => m !== uid) ?? '';
   const other = match.people?.[otherId] ?? { firstName: 'Your match', photoUrl: null };
   const expired = match.status === 'expired' || match.stage === 'expired';
+  const sparkPending = match.stage === 'spark_pending';
   const waitingForThem = match.stage === 'awaiting_first_voice' && match.firstSenderId !== uid;
   const unlocked = match.stage === 'text_unlocked';
-  const canRecord = match.status === 'active' && !expired && !waitingForThem;
+  const canRecord = match.status === 'active' && !expired && !waitingForThem && !sparkPending;
   const helper = helperText(match, uid, otherId, other.firstName);
 
   const openProfile = () => {
@@ -196,7 +200,7 @@ export default function ChatScreen() {
               <AppText variant="bodyStrong" style={styles.name}>
                 {other.firstName}
               </AppText>
-              <AppText variant="caption">{matchedLabel(match, new Date(now))}</AppText>
+              <AppText variant="caption">{matchedLabel(match, new Date(now), uid)}</AppText>
             </Pressable>
             {match.status === 'active' ? (
               <SafetyActions
@@ -348,7 +352,11 @@ export default function ChatScreen() {
               <AppText variant="bodyStrong" color="textMuted" align="center" style={styles.blocked}>
                 {expired
                   ? 'This match has expired.'
-                  : `Waiting for ${other.firstName}’s first voice note. We’ll let you know when it arrives.`}
+                  : sparkPending
+                    ? match.sparkedBy === uid
+                      ? `Waiting for ${other.firstName} to accept your Spark.`
+                      : `Accept ${other.firstName}’s Spark in Connections to start chatting.`
+                    : `Waiting for ${other.firstName}’s first voice note. We’ll let you know when it arrives.`}
               </AppText>
             )}
           </View>

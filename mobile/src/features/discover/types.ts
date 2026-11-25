@@ -23,7 +23,7 @@ export type DiscoverCard = {
   mode?: 'date' | 'friends';
 };
 
-export type SwipeAction = 'like' | 'pass' | 'save';
+export type SwipeAction = 'like' | 'pass' | 'spark';
 
 export type MatchResult = {
   matchId: string;

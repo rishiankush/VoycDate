@@ -23,7 +23,7 @@ export {
   sendVoiceMessage,
   submitUnlockDecision,
 } from './messages';
-export { swipe } from './swipe';
+export { swipe, respondToSpark } from './swipe';
 export { checkVideoIntro, moderateProfileMedia } from './moderation';
 export { transcribeVoiceMessage } from './transcription';
 export { unmatch, blockUser, unblockUser, reportUser, listBlockedUsers } from './safety';

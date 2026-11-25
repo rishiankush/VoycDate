@@ -1,13 +1,15 @@
 import { setAudioModeAsync } from 'expo-audio';
 import { router, useFocusEffect } from 'expo-router';
 import { Bell, SlidersHorizontal } from 'lucide-react-native';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button, GlowBackground, IconButton } from '@/components/ui';
+import { useSession } from '@/features/auth/SessionProvider';
 import { useDiscovery } from '@/features/discover/DiscoveryProvider';
-import { ProfileCard } from '@/features/discover/ProfileCard';
+import { ProfileCard, type ProfileCardHandle } from '@/features/discover/ProfileCard';
+import { SparkUpsellSheet } from '@/features/discover/SparkUpsellSheet';
 import { SwipeActions } from '@/features/discover/SwipeActions';
 import type { DiscoverCard, SwipeAction } from '@/features/discover/types';
 import { useFeedMuted } from '@/features/discover/useFeedMuted';
@@ -18,18 +20,29 @@ import { colors, layout, spacing } from '@/theme';
 
 const REFILL_WHEN_LEFT = 4;
 
+function isPremiumActive(expiresAt: { toMillis?: () => number } | null | undefined, active?: boolean) {
+  if (!active) return false;
+  if (expiresAt?.toMillis && expiresAt.toMillis() < Date.now()) return false;
+  return true;
+}
+
 /** Bumble-style Discover: one profile card at a time, swipe or tap to like / pass. */
 export default function DiscoverScreen() {
   return <CardDeck />;
 }
 
 function CardDeck() {
+  const { record } = useSession();
   const { profile, preferences } = useMyProfile();
   const { status, error, cards, exhausted, load, swipe } = useDiscovery();
   const [muted, toggleMute] = useFeedMuted();
   const [focused, setFocused] = useState(true);
   const [deckKey, setDeckKey] = useState(0);
+  const [upsell, setUpsell] = useState<DiscoverCard | null>(null);
+  const cardRef = useRef<ProfileCardHandle>(null);
+  const animating = useRef(false);
   const mode = profile.mode === 'friends' ? 'friends' : 'date';
+  const premium = isPremiumActive(record?.premium?.expiresAt ?? null, record?.premium?.active);
 
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
@@ -60,10 +73,21 @@ function CardDeck() {
   const top = cards[0];
   const next = cards[1];
 
-  const act = (card: DiscoverCard, action: SwipeAction) => {
+  const commitAction = (card: DiscoverCard, action: SwipeAction) => {
+    animating.current = false;
     swipe(card, action);
-    // Remount the next card so pan shared values reset cleanly.
     setDeckKey((k) => k + 1);
+  };
+
+  const act = (card: DiscoverCard, action: SwipeAction) => {
+    if (animating.current) return;
+    // Free users never send a Spark — show the Bumble-style upsell first.
+    if (action === 'spark' && !premium) {
+      setUpsell(card);
+      return;
+    }
+    animating.current = true;
+    cardRef.current?.animateAction(action);
   };
 
   if (!top) {
@@ -92,15 +116,17 @@ function CardDeck() {
     );
   }
 
+  const upsellPhoto = upsell?.video?.posterUrl ?? upsell?.photos[0]?.url ?? null;
+
   return (
     <View style={styles.root}>
       <GlowBackground />
       <SafeAreaView style={styles.root} edges={['top']}>
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <AppText variant="heading">{mode === 'friends' ? 'Discover · Friends' : 'Discover · Date'}</AppText>
+            <AppText variant="heading">Discover</AppText>
             <AppText variant="caption" color="textMuted">
-              {profile.location?.city ?? 'Near you'} · within{' '}
+              {mode === 'friends' ? 'Friends' : 'Date'} · {profile.location?.city ?? 'Near you'} · within{' '}
               {formatDistance(preferences.maxDistanceKm ?? DISTANCE_DEFAULT_KM)}
             </AppText>
           </View>
@@ -130,12 +156,13 @@ function CardDeck() {
             />
           ) : null}
           <ProfileCard
+            ref={cardRef}
             key={`${top.uid}-${deckKey}`}
             card={top}
             active={focused}
             muted={muted}
             onToggleMute={toggleMute}
-            onAction={(action) => act(top, action)}
+            onAction={(action) => commitAction(top, action)}
             onOpenProfile={() => router.push({ pathname: '/person/[uid]', params: { uid: top.uid } })}
           />
         </View>
@@ -148,6 +175,17 @@ function CardDeck() {
           <SwipeActions name={top.firstName} onAction={(action) => act(top, action)} />
         </View>
       </SafeAreaView>
+
+      <SparkUpsellSheet
+        visible={Boolean(upsell)}
+        firstName={upsell?.firstName ?? 'them'}
+        photoUrl={upsellPhoto}
+        onClose={() => setUpsell(null)}
+        onUnlock={() => {
+          setUpsell(null);
+          router.push('/paywall');
+        }}
+      />
     </View>
   );
 }
@@ -169,9 +207,10 @@ function DiscoverShell({
       <SafeAreaView style={styles.root} edges={['top']}>
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <AppText variant="heading">{mode === 'friends' ? 'Discover · Friends' : 'Discover · Date'}</AppText>
+            <AppText variant="heading">Discover</AppText>
             <AppText variant="caption" color="textMuted">
-              {place ?? 'Near you'} · within {formatDistance(distanceKm ?? DISTANCE_DEFAULT_KM)}
+              {mode === 'friends' ? 'Friends' : 'Date'} · {place ?? 'Near you'} · within{' '}
+              {formatDistance(distanceKm ?? DISTANCE_DEFAULT_KM)}
             </AppText>
           </View>
           <IconButton

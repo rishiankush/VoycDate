@@ -45,20 +45,26 @@ for (const user of users) {
   const showMe = prefs.showMe ?? me.showMe;
   const range = prefs.ageRange ?? me.ageRange;
   const maxKm = prefs.maxDistanceKm ?? me.maxDistanceKm;
-  console.log(`  active=${me.active} mode=${me.mode} gender=${me.genderGroup} showMe=${showMe} age=${myAge} range=${range.min}-${range.max} distance=${maxKm}km at ${me.lat},${me.lng}`);
+  const myMode = me.mode === 'friends' ? 'friends' : 'date';
+  console.log(`  active=${me.active} mode=${myMode} gender=${me.genderGroup} showMe=${showMe} age=${myAge} range=${range.min}-${range.max} distance=${maxKm}km at ${me.lat},${me.lng}`);
+  if (seeds.length === 0) console.log('  (no active seed_ discovery docs — run npm run seed)');
 
   for (const s of seeds) {
     const c = s.data();
+    const theirMode = c.mode === 'friends' ? 'friends' : 'date';
     const reasons = [];
-    if (c.mode !== me.mode) reasons.push(`mode ${c.mode}`);
+    if (theirMode !== myMode) reasons.push(`mode ${theirMode}`);
     const km = distanceBetween([me.lat, me.lng], [c.lat, c.lng]);
     if (km > maxKm) reasons.push(`${km.toFixed(1)}km > your ${maxKm}km`);
     if (!shared.wantsToSee(showMe, c.genderGroup)) reasons.push(`you show ${showMe}, they are ${c.genderGroup}`);
     if (!shared.wantsToSee(c.showMe, me.genderGroup)) reasons.push(`they show ${c.showMe}, you are ${me.genderGroup}`);
     const age = shared.ageFromBirthDate(c.birthDate);
     if (age < range.min || (range.max < 80 && age > range.max)) reasons.push(`age ${age} outside your ${range.min}-${range.max}`);
-    const swiped = (await db.doc(`swipes/${user.id}/outgoing/${s.id}`).get()).exists;
-    if (swiped) reasons.push('already swiped');
+    const [modeSwipe, legacySwipe] = await db.getAll(
+      db.doc(`swipes/${user.id}/outgoing/${s.id}_${myMode}`),
+      db.doc(`swipes/${user.id}/outgoing/${s.id}`),
+    );
+    if (modeSwipe.exists || (myMode === 'date' && legacySwipe.exists)) reasons.push('already swiped');
     console.log(`  ${reasons.length ? '✗' : '✓'} ${c.card.firstName} (${age}, ${c.genderGroup}, ${km.toFixed(1)}km)${reasons.length ? ` — ${reasons.join('; ')}` : ''}`);
   }
 }

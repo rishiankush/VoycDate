@@ -22,55 +22,69 @@ export async function ensureNotificationPermissions() {
   return Notifications.requestPermissionsAsync();
 }
 
-/** Registers this device for push and stores the token on `users/{uid}`. */
-export async function registerPushToken(uid: string) {
-  if (!Device.isDevice) return null;
-
-  const permission = await ensureNotificationPermissions();
-  if (!permission.granted) return null;
-
-  if (Platform.OS === 'android') {
+/**
+ * Android requires a channel for heads-up alerts. Some Expo Go / emulator builds throw
+ * a native NPE from setNotificationChannelAsync — treat channel setup as best-effort.
+ */
+async function ensureAndroidChannel() {
+  if (Platform.OS !== 'android') return;
+  try {
     await Notifications.setNotificationChannelAsync('voyc-default', {
       name: 'VOYC',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#471448',
+      importance: Notifications.AndroidImportance.DEFAULT,
     });
-  }
-
-  const projectId = easProjectId();
-  let token: string | null = null;
-  try {
-    if (projectId) {
-      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    } else {
-      token = (await Notifications.getDevicePushTokenAsync()).data as string;
-    }
   } catch {
-    try {
-      token = (await Notifications.getDevicePushTokenAsync()).data as string;
-    } catch {
-      return null;
-    }
+    // Channel creation failed (known Expo Go / Android NPE). Push can still work
+    // on the default channel; never crash the app.
   }
-  if (!token) return null;
+}
 
-  await setDoc(
-    userDoc(uid),
-    {
-      expoPushTokens: {
-        [token]: {
-          platform: Platform.OS,
-          updatedAt: serverTimestamp(),
+/** Registers this device for push and stores the token on `users/{uid}`. */
+export async function registerPushToken(uid: string) {
+  try {
+    if (!Device.isDevice) return null;
+
+    const permission = await ensureNotificationPermissions();
+    if (!permission.granted) return null;
+
+    await ensureAndroidChannel();
+
+    const projectId = easProjectId();
+    let token: string | null = null;
+    try {
+      if (projectId) {
+        token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      } else {
+        token = (await Notifications.getDevicePushTokenAsync()).data as string;
+      }
+    } catch {
+      try {
+        token = (await Notifications.getDevicePushTokenAsync()).data as string;
+      } catch {
+        return null;
+      }
+    }
+    if (!token) return null;
+
+    await setDoc(
+      userDoc(uid),
+      {
+        expoPushTokens: {
+          [token]: {
+            platform: Platform.OS,
+            updatedAt: serverTimestamp(),
+          },
         },
+        notificationsPermission: 'granted',
+        updatedAt: serverTimestamp(),
       },
-      notificationsPermission: 'granted',
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
+      { merge: true },
+    );
 
-  return token;
+    return token;
+  } catch {
+    return null;
+  }
 }
 
 export async function clearPushToken(uid: string, token: string | null) {

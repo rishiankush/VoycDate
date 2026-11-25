@@ -1,13 +1,14 @@
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView, type VideoPlayer } from 'expo-video';
 import { BadgeCheck, Volume2, VolumeX } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
   interpolate,
   runOnJS,
+  runOnUI,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -22,8 +23,10 @@ import { PhotoGradient } from './PhotoGradient';
 import type { DiscoverCard, SwipeAction } from './types';
 
 const SCREEN_W = Dimensions.get('window').width;
+const SCREEN_H = Dimensions.get('window').height;
 const SWIPE_X = SCREEN_W * 0.28;
 const OUT_X = SCREEN_W * 1.2;
+const SPARK_OUT_Y = -SCREEN_H * 1.05;
 
 function setMuted(player: VideoPlayer, muted: boolean) {
   player.muted = muted;
@@ -49,15 +52,15 @@ type ProfileCardProps = {
   onOpenProfile: () => void;
 };
 
-export function ProfileCard({
-  card,
-  active,
-  behind = false,
-  muted,
-  onToggleMute,
-  onAction,
-  onOpenProfile,
-}: ProfileCardProps) {
+export type ProfileCardHandle = {
+  /** Animate the card out, then call onAction (used by Pass / Like / Spark buttons). */
+  animateAction: (action: SwipeAction) => void;
+};
+
+export const ProfileCard = forwardRef<ProfileCardHandle, ProfileCardProps>(function ProfileCard(
+  { card, active, behind = false, muted, onToggleMute, onAction, onOpenProfile },
+  ref,
+) {
   const video = card.video;
   const [showCover, setShowCover] = useState(true);
   const player = useVideoPlayer(active && video ? video.url : null, (p) => {
@@ -66,6 +69,7 @@ export function ProfileCard({
 
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
+  const scale = useSharedValue(1);
   const leaving = useSharedValue(false);
 
   useEffect(() => {
@@ -75,22 +79,39 @@ export function ProfileCard({
   useEffect(() => setMuted(player, muted), [player, muted]);
   useEffect(() => syncPlayback(player, active && !behind), [player, active, behind]);
 
-  // Keep poster until the first decoded frame — avoids a black flash on slow networks.
-  // No timed hide: that would uncover the player before it's ready and waste a blank paint.
-
   const commit = (action: SwipeAction) => {
     onAction(action);
   };
 
   const flyOut = (action: SwipeAction) => {
     'worklet';
+    if (leaving.value) return;
     leaving.value = true;
+
+    if (action === 'spark') {
+      // Bumble-style: card lifts straight up from its spot.
+      tx.value = withTiming(0, { duration: 420 });
+      ty.value = withTiming(SPARK_OUT_Y, { duration: 420 }, (done) => {
+        if (done) runOnJS(commit)(action);
+      });
+      scale.value = withTiming(0.86, { duration: 420 });
+      return;
+    }
+
     const dir = action === 'like' ? 1 : -1;
     tx.value = withTiming(dir * OUT_X, { duration: 220 }, (done) => {
       if (done) runOnJS(commit)(action);
     });
     ty.value = withTiming(action === 'like' ? -24 : 24, { duration: 220 });
+    scale.value = withTiming(1, { duration: 220 });
   };
+
+  useImperativeHandle(ref, () => ({
+    animateAction: (action) => {
+      // Buttons run on the JS thread; drive the exit animation on the UI thread.
+      runOnUI(flyOut)(action);
+    },
+  }));
 
   const openProfile = () => {
     onOpenProfile();
@@ -136,7 +157,7 @@ export function ProfileCard({
         { translateX: behind ? 0 : tx.value },
         { translateY: behind ? 8 : ty.value },
         { rotate: `${behind ? 0 : rotate}deg` },
-        { scale: behind ? 0.96 : 1 },
+        { scale: behind ? 0.96 : scale.value },
       ],
       opacity: behind ? 0.88 : 1,
     };
@@ -152,11 +173,16 @@ export function ProfileCard({
     transform: [{ rotate: '12deg' }, { scale: interpolate(tx.value, [-SWIPE_X, -24], [1, 0.85], Extrapolation.CLAMP) }],
   }));
 
+  const sparkStamp = useAnimatedStyle(() => ({
+    opacity: interpolate(ty.value, [-40, -160], [0, 1], Extrapolation.CLAMP),
+    transform: [{ scale: interpolate(ty.value, [-40, -160], [0.85, 1], Extrapolation.CLAMP) }],
+  }));
+
   const cover = video?.posterUrl ?? card.photos[0]?.url ?? null;
   const isFriends = card.mode === 'friends';
   const intent = isFriends ? null : intentLabel(card.intent);
 
-  const content = (
+  const cardBody = (
     <Animated.View
       accessible
       accessibilityRole="button"
@@ -193,6 +219,11 @@ export function ProfileCard({
               PASS
             </AppText>
           </Animated.View>
+          <Animated.View style={[styles.stamp, styles.sparkStamp, sparkStamp]} pointerEvents="none">
+            <AppText variant="heading" color="plum">
+              SPARK
+            </AppText>
+          </Animated.View>
         </>
       ) : null}
 
@@ -202,17 +233,6 @@ export function ProfileCard({
             Intro video
           </AppText>
         </View>
-      ) : null}
-
-      {active && video && !behind ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={muted ? 'Unmute intro' : 'Mute intro'}
-          onPress={onToggleMute}
-          hitSlop={8}
-          style={styles.mute}>
-          {muted ? <VolumeX size={18} color={colors.white} /> : <Volume2 size={18} color={colors.white} />}
-        </Pressable>
       ) : null}
 
       <View style={styles.info} pointerEvents="none">
@@ -246,14 +266,30 @@ export function ProfileCard({
     </Animated.View>
   );
 
-  if (behind) return content;
-  return <GestureDetector gesture={gesture}>{content}</GestureDetector>;
-}
+  // Mute sits outside the pan/tap detector so muting never opens the profile.
+  if (behind) return cardBody;
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <GestureDetector gesture={gesture}>{cardBody}</GestureDetector>
+      {active && video ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={muted ? 'Unmute intro' : 'Mute intro'}
+          onPress={onToggleMute}
+          hitSlop={8}
+          style={styles.mute}>
+          {muted ? <VolumeX size={18} color={colors.white} /> : <Volume2 size={18} color={colors.white} />}
+        </Pressable>
+      ) : null}
+    </View>
+  );
+});
 
 const styles = StyleSheet.create({
   card: {
     ...StyleSheet.absoluteFill,
-    borderRadius: radii.lg,
+    // Figma Discover card uses ~32px corners.
+    borderRadius: 32,
     overflow: 'hidden',
     backgroundColor: colors.plumDeep,
     ...shadows.card,
@@ -281,6 +317,10 @@ const styles = StyleSheet.create({
     right: spacing.lg,
     borderColor: colors.danger,
   },
+  sparkStamp: {
+    alignSelf: 'center',
+    borderColor: colors.pinkBorderStrong,
+  },
   introBadge: {
     position: 'absolute',
     top: spacing.md,
@@ -288,6 +328,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
     borderRadius: radii.pill,
+    // Figma intent / Friends chip: pink fill, plum label.
     backgroundColor: colors.pink,
   },
   mute: {

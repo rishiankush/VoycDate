@@ -12,7 +12,7 @@ const REFILL_BELOW = 4;
 const fetchFeed = httpsCallable<{ exclude: string[] }, { cards: DiscoverCard[] }>(functions, 'getDiscoveryFeed');
 const sendSwipe = httpsCallable<
   { targetId: string; action: SwipeAction },
-  ({ matched: true } & MatchResult) | { matched: false }
+  ({ matched: true } & MatchResult) | { matched: false; sparked?: boolean }
 >(functions, 'swipe');
 
 type FeedStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -91,20 +91,43 @@ export function DiscoveryProvider({ children }: { children: ReactNode }) {
           if (data.matched) {
             setLastMatch(data);
             router.push('/match');
+            return;
+          }
+          if (action === 'spark' && 'sparked' in data && data.sparked) {
+            Alert.alert(
+              'Spark sent',
+              `If ${card.firstName} accepts, you’ll match and can start the voice chat.`,
+              [{ text: 'Nice' }],
+            );
           }
         })
         .catch((error: unknown) => {
           decided.current.delete(card.uid);
           setCards((prev) => [card, ...prev.filter((c) => c.uid !== card.uid)]);
           const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
-          if (code === 'functions/resource-exhausted' && action === 'like') {
-            Alert.alert('Out of likes for today', 'Upgrade to Premium for unlimited likes.', [
+          if (code === 'functions/permission-denied' && action === 'spark') {
+            Alert.alert('Spark is a Premium perk', 'Get 5 Sparks every week to send a connect request.', [
               { text: 'Not now', style: 'cancel' },
               { text: 'Upgrade', onPress: () => router.push('/paywall') },
             ]);
             return;
           }
-          Alert.alert('Couldn’t save that', 'Check your connection and try again.');
+          if (code === 'functions/resource-exhausted') {
+            if (action === 'spark') {
+              Alert.alert('No Sparks left this week', 'Premium includes 5 Sparks each week. They refresh next week.', [
+                { text: 'OK' },
+              ]);
+              return;
+            }
+            if (action === 'like') {
+              Alert.alert('Out of likes for today', 'Upgrade to Premium for unlimited likes.', [
+                { text: 'Not now', style: 'cancel' },
+                { text: 'Upgrade', onPress: () => router.push('/paywall') },
+              ]);
+              return;
+            }
+          }
+          Alert.alert('Couldn’t send that', 'Check your connection and try again.');
         });
     },
     [cards, load],

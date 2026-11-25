@@ -1,4 +1,4 @@
-import { Bookmark, Heart, X } from 'lucide-react-native';
+import { Heart, Sparkles, X } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -32,11 +32,12 @@ export function SwipeActions({ onAction, disabled = false, name = '' }: SwipeAct
         icon={<Heart size={30} color={colors.white} fill={colors.white} />}
       />
       <ActionButton
-        label="Save"
-        a11y={`Save ${name}’s profile for later`}
-        onPress={() => onAction('save')}
+        label="Spark"
+        a11y={`Send ${name} a Spark connect request`}
+        onPress={() => onAction('spark')}
         disabled={disabled}
-        icon={<Bookmark size={24} color={colors.plum} strokeWidth={2.2} />}
+        accent
+        icon={<Sparkles size={22} color={colors.plum} strokeWidth={2.2} />}
       />
     </View>
   );
@@ -49,9 +50,10 @@ type ActionButtonProps = {
   onPress: () => void;
   disabled: boolean;
   primary?: boolean;
+  accent?: boolean;
 };
 
-function ActionButton({ label, a11y, icon, onPress, disabled, primary = false }: ActionButtonProps) {
+function ActionButton({ label, a11y, icon, onPress, disabled, primary = false, accent = false }: ActionButtonProps) {
   return (
     <View style={styles.item}>
       <Pressable
@@ -62,13 +64,16 @@ function ActionButton({ label, a11y, icon, onPress, disabled, primary = false }:
         onPress={onPress}
         style={({ pressed }) => [
           styles.circle,
-          primary ? styles.primary : styles.secondary,
+          primary ? styles.primary : accent ? styles.accent : styles.secondary,
           disabled && styles.disabled,
           pressed && styles.pressed,
         ]}>
         {icon}
       </Pressable>
-      <AppText variant="label" color={primary ? 'plum' : 'textMuted'} style={primary && styles.primaryLabel}>
+      <AppText
+        variant="label"
+        color={primary || accent ? 'plum' : 'textMuted'}
+        style={(primary || accent) && styles.emphasisLabel}>
         {label}
       </AppText>
     </View>
@@ -97,6 +102,14 @@ const styles = StyleSheet.create({
     borderRadius: 31,
     backgroundColor: colors.white,
   },
+  accent: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: colors.pinkTint,
+    borderWidth: 1.5,
+    borderColor: colors.pink,
+  },
   primary: {
     width: 78,
     height: 78,
@@ -104,7 +117,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.plum,
     ...shadows.button,
   },
-  primaryLabel: {
+  emphasisLabel: {
     fontFamily: fontFamily.sansBold,
   },
   disabled: {

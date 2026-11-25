@@ -148,12 +148,20 @@ export const getDiscoveryFeed = onCall(async (request) => {
   });
 
   // Check earlier swipes only for the shortlist, instead of reading the user's whole swipe history.
+  // Mode-scoped ids are current; bare targetId is pre–Friends (date mode only).
   const cards: (typeof candidates)[number][] = [];
   for (let i = 0; i < candidates.length && cards.length < FEED_LIMIT; i += SWIPE_CHECK_CHUNK) {
     const chunk = candidates.slice(i, i + SWIPE_CHECK_CHUNK);
-    const swipes = await firestore.getAll(...chunk.map((c) => firestore.doc(`swipes/${uid}/outgoing/${c.uid}`)));
+    const refs = chunk.flatMap((c) => [
+      firestore.doc(`swipes/${uid}/outgoing/${c.uid}_${myMode}`),
+      firestore.doc(`swipes/${uid}/outgoing/${c.uid}`),
+    ]);
+    const swipes = await firestore.getAll(...refs);
     chunk.forEach((c, j) => {
-      if (!swipes[j].exists && cards.length < FEED_LIMIT) cards.push(c);
+      const modeScoped = swipes[j * 2];
+      const legacy = swipes[j * 2 + 1];
+      const already = modeScoped.exists || (myMode === 'date' && legacy.exists);
+      if (!already && cards.length < FEED_LIMIT) cards.push(c);
     });
   }
 

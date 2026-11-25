@@ -11,6 +11,7 @@ import { colors, radii, spacing } from '@/theme';
 const PERKS = [
   { label: 'See who liked you', premium: true },
   { label: 'Unlimited likes', premium: true },
+  { label: '5 Sparks every week', premium: true },
   { label: 'Advanced filters', premium: true },
   { label: 'Weekly profile boost', premium: true },
 ];

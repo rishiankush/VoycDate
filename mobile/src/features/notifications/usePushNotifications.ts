@@ -39,9 +39,13 @@ export function usePushNotifications(enabled: boolean) {
 
     if (!openedColdStart.current) {
       openedColdStart.current = true;
-      void Notifications.getLastNotificationResponseAsync().then((response) => {
-        if (response) openFromData(response.notification.request.content.data as Record<string, unknown>);
-      });
+      void Notifications.getLastNotificationResponseAsync()
+        .then((response) => {
+          if (response) openFromData(response.notification.request.content.data as Record<string, unknown>);
+        })
+        .catch(() => {
+          // Expo Go / Android can reject notification APIs; ignore.
+        });
     }
 
     return () => sub.remove();

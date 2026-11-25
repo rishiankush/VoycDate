@@ -49,6 +49,9 @@ export const sendVoiceMessage = onCall(async (request) => {
     if (existing.exists) return { ok: true as const, duplicate: true as const };
 
     const other = match.members.find((m: string) => m !== uid) as string;
+    if (match.stage === 'spark_pending') {
+      throw new HttpsError('failed-precondition', 'Wait until the Spark is accepted to chat.');
+    }
     if (match.stage === 'awaiting_first_voice') {
       if (match.firstSenderId !== uid) {
         throw new HttpsError('failed-precondition', 'Your match sends the first voice note.');

@@ -5,7 +5,13 @@ import { useSession } from '@/features/auth/SessionProvider';
 import type { UnlockDecision } from '@/features/chat/types';
 import { db } from '@/lib/firebase';
 
-export type MatchStage = 'awaiting_first_voice' | 'voice' | 'deciding' | 'text_unlocked' | 'expired';
+export type MatchStage =
+  | 'spark_pending'
+  | 'awaiting_first_voice'
+  | 'voice'
+  | 'deciding'
+  | 'text_unlocked'
+  | 'expired';
 
 export type Match = {
   id: string;
@@ -14,6 +20,8 @@ export type Match = {
   /** Date vs Friends — Connections filters to the active profile mode. */
   mode?: 'date' | 'friends';
   firstSenderId: string;
+  /** Premium user who sent the Spark (present while stage is spark_pending or after). */
+  sparkedBy?: string;
   stage: MatchStage;
   status: 'active' | 'unmatched' | 'blocked' | 'expired';
   voice?: { qualifiedCount: number; perUser: Record<string, number>; totalDurationMs?: number };

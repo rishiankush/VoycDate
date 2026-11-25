@@ -18,6 +18,7 @@ import { colors, layout, radii, shadows, spacing } from '@/theme';
 const PREMIUM_PERKS = [
   { label: 'See who liked you', free: false },
   { label: 'Unlimited likes', free: false },
+  { label: '5 Sparks every week', free: false },
   { label: 'Advanced filters', free: false },
   { label: 'Weekly boost', free: false },
 ];
@@ -325,9 +326,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.pinkBorder,
-    backgroundColor: colors.pinkTint,
+    backgroundColor: colors.white,
   },
   modeChipActive: {
+    // Figma selected chips: plum fill, white label.
     backgroundColor: colors.plum,
     borderColor: colors.plum,
   },

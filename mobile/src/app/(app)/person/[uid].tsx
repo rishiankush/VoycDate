@@ -6,8 +6,10 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, IconButton } from '@/components/ui';
+import { useSession } from '@/features/auth/SessionProvider';
 import { useDiscovery } from '@/features/discover/DiscoveryProvider';
 import { intentLabel, nameAgeLine, placeLine } from '@/features/discover/labels';
+import { SparkUpsellSheet } from '@/features/discover/SparkUpsellSheet';
 import { SwipeActions } from '@/features/discover/SwipeActions';
 import type { DiscoverCard, SwipeAction } from '@/features/discover/types';
 import { formatHeight } from '@/features/onboarding/units';
@@ -15,6 +17,12 @@ import { fetchMatchProfile } from '@/features/premium/premium';
 import { SafetyActions } from '@/features/safety/SafetyActions';
 import { VideoCover } from '@/features/video/VideoCover';
 import { colors, layout, radii, spacing } from '@/theme';
+
+function isPremiumActive(expiresAt: { toMillis?: () => number } | null | undefined, active?: boolean) {
+  if (!active) return false;
+  if (expiresAt?.toMillis && expiresAt.toMillis() < Date.now()) return false;
+  return true;
+}
 
 function basics(card: DiscoverCard) {
   return [
@@ -32,12 +40,15 @@ function basics(card: DiscoverCard) {
 
 export default function PersonScreen() {
   const { uid, matchId } = useLocalSearchParams<{ uid: string; matchId?: string }>();
+  const { record } = useSession();
   const { findCard, swipe } = useDiscovery();
   const fromMatch = Boolean(matchId);
   const discoveryCard = fromMatch ? undefined : findCard(uid);
   const [matchCard, setMatchCard] = useState<DiscoverCard | null>(null);
   const [loadingMatch, setLoadingMatch] = useState(fromMatch);
   const [loadError, setLoadError] = useState(false);
+  const [sparkUpsell, setSparkUpsell] = useState(false);
+  const premium = isPremiumActive(record?.premium?.expiresAt ?? null, record?.premium?.active);
 
   useEffect(() => {
     if (!fromMatch || !matchId || !uid) return;
@@ -78,6 +89,10 @@ export default function PersonScreen() {
   }
 
   const act = (action: SwipeAction) => {
+    if (action === 'spark' && !premium) {
+      setSparkUpsell(true);
+      return;
+    }
     router.back();
     swipe(card, action);
   };
@@ -161,11 +176,22 @@ export default function PersonScreen() {
       {!fromMatch ? (
         <SafeAreaView edges={['bottom']} style={styles.actions}>
           <AppText variant="caption" color="textMuted" align="center" style={styles.actionHint}>
-            Like means you like {card.firstName}’s profile
+            Spark sends a Premium connect request — they accept to match
           </AppText>
           <SwipeActions name={card.firstName} onAction={act} />
         </SafeAreaView>
       ) : null}
+
+      <SparkUpsellSheet
+        visible={sparkUpsell}
+        firstName={card.firstName}
+        photoUrl={card.video?.posterUrl ?? card.photos[0]?.url ?? null}
+        onClose={() => setSparkUpsell(false)}
+        onUnlock={() => {
+          setSparkUpsell(false);
+          router.push('/paywall');
+        }}
+      />
     </View>
   );
 }
@@ -212,7 +238,8 @@ const styles = StyleSheet.create({
     padding: layout.screenPadding,
   },
   content: {
-    paddingBottom: 140,
+    // Clear the floating Pass / Like / Spark bar + home indicator.
+    paddingBottom: 220,
   },
   contentMatch: {
     paddingBottom: spacing.xxl,
@@ -256,8 +283,10 @@ const styles = StyleSheet.create({
   topBar: {
     position: 'absolute',
     top: 0,
-    left: spacing.sm,
-    right: spacing.sm,
+    left: 0,
+    right: 0,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
@@ -266,9 +295,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingVertical: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
     gap: spacing.xs,
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: 'rgba(255,255,255,0.96)',
   },
   actionHint: {
     paddingHorizontal: layout.screenPadding,

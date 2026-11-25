@@ -4,6 +4,7 @@ import { onCall } from 'firebase-functions/v2/https';
 import { ageFromBirthDate, db, requireUid } from './shared';
 
 export const DEFAULT_DAILY_LIKES = 25;
+export const DEFAULT_WEEKLY_SPARKS = 5;
 
 /** Calendar day in India (VOYC Date’s primary market). */
 export function likesDayKey(now = new Date()) {
@@ -13,6 +14,25 @@ export function likesDayKey(now = new Date()) {
     month: '2-digit',
     day: '2-digit',
   }).format(now);
+}
+
+/** ISO week key (YYYY-Www) in India — Sparks refresh each week. */
+export function sparksWeekKey(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const year = Number(parts.find((p) => p.type === 'year')?.value);
+  const month = Number(parts.find((p) => p.type === 'month')?.value);
+  const day = Number(parts.find((p) => p.type === 'day')?.value);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  const weekday = utc.getUTCDay() || 7;
+  utc.setUTCDate(utc.getUTCDate() + 4 - weekday);
+  const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((utc.getTime() - yearStart.getTime()) / 86_400_000) + 1) / 7);
+  return `${utc.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
 export function isPremium(user: FirebaseFirestore.DocumentData | undefined) {
@@ -26,6 +46,12 @@ export async function readDailyLikeLimit() {
   const snap = await db().doc('config/limits').get();
   const value = snap.data()?.dailyLikes;
   return typeof value === 'number' && value > 0 ? value : DEFAULT_DAILY_LIKES;
+}
+
+export async function readWeeklySparkLimit() {
+  const snap = await db().doc('config/limits').get();
+  const value = snap.data()?.weeklySparks;
+  return typeof value === 'number' && value > 0 ? value : DEFAULT_WEEKLY_SPARKS;
 }
 
 export const getLikesTab = onCall(async (request) => {

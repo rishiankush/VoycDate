@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { BlurView } from 'expo-blur';
-import { Heart, Bookmark, X } from 'lucide-react-native';
+import { Heart, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
@@ -159,12 +159,12 @@ export default function LikesScreen() {
     void load();
   }, [mode, load]);
 
-  const act = (person: LikeTile, action: SwipeAction, list: 'likedYou' | 'saved') => {
+  const act = (person: LikeTile, action: SwipeAction) => {
     if (person.blurred) {
       router.push('/(app)/paywall');
       return;
     }
-    // Pass on Liked you / Saved actions that need a clear profile are Premium-only.
+    // Pass on Liked you needs a clear profile — Premium-only.
     if (action === 'pass' && !data?.premium) {
       router.push('/(app)/paywall');
       return;
@@ -176,9 +176,8 @@ export default function LikesScreen() {
       prev
         ? {
             ...prev,
-            likedYouCount: list === 'likedYou' ? Math.max(0, prev.likedYouCount - 1) : prev.likedYouCount,
-            likedYou: list === 'likedYou' ? prev.likedYou.filter((p) => p.uid !== person.uid) : prev.likedYou,
-            saved: list === 'saved' ? prev.saved.filter((p) => p.uid !== person.uid) : prev.saved,
+            likedYouCount: Math.max(0, prev.likedYouCount - 1),
+            likedYou: prev.likedYou.filter((p) => p.uid !== person.uid),
           }
         : prev,
     );
@@ -186,23 +185,23 @@ export default function LikesScreen() {
     setBusyId(null);
   };
 
-  const title = mode === 'friends' ? 'Likes · Friends' : 'Likes · Date';
-
   if (loading && !data) {
     return (
-      <TabScreen title={title}>
+      <TabScreen title="Likes">
         <ActivityIndicator color={colors.plum} />
       </TabScreen>
     );
   }
 
   const likedYou = data?.likedYou ?? [];
-  const saved = data?.saved ?? [];
   const premium = data?.premium ?? false;
   const remaining = data?.likesRemaining;
 
   return (
-    <TabScreen title={title}>
+    <TabScreen title="Likes">
+      <AppText variant="caption" color="textMuted">
+        {mode === 'friends' ? 'Friends mode' : 'Date mode'}
+      </AppText>
       {!premium ? (
         <PinkGradient variant="banner" style={styles.banner}>
           <AppText variant="bodyStrong" color="plum">
@@ -240,31 +239,7 @@ export default function LikesScreen() {
               premium={premium}
               busy={busyId === person.uid}
               onReveal={() => router.push('/(app)/paywall')}
-              onAction={(action) => act(person, action, 'likedYou')}
-            />
-          ))}
-        </View>
-      )}
-
-      <AppText variant="label" color="textMuted" style={styles.section}>
-        Saved
-      </AppText>
-      {saved.length === 0 ? (
-        <EmptyCard
-          icon={<Bookmark size={36} color={colors.pinkBorderStrong} />}
-          title="No saved profiles"
-          body="Tap Save on Discover to keep someone for later."
-        />
-      ) : (
-        <View style={styles.grid}>
-          {saved.map((person) => (
-            <Tile
-              key={person.uid}
-              person={person}
-              premium={premium}
-              busy={busyId === person.uid}
-              onReveal={() => router.push('/(app)/paywall')}
-              onAction={(action) => act(person, action, 'saved')}
+              onAction={(action) => act(person, action)}
             />
           ))}
         </View>
@@ -283,9 +258,6 @@ const styles = StyleSheet.create({
   },
   bannerBtn: {
     marginTop: spacing.xs,
-  },
-  section: {
-    marginTop: spacing.md,
   },
   grid: {
     flexDirection: 'row',
