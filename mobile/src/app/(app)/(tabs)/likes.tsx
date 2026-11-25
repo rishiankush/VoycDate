@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Heart, Bookmark, X } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, PinkGradient } from '@/components/ui';
@@ -10,6 +10,7 @@ import { useDiscovery } from '@/features/discover/DiscoveryProvider';
 import type { DiscoverCard, SwipeAction } from '@/features/discover/types';
 import { EmptyCard, TabScreen } from '@/features/navigation/TabScreen';
 import { fetchLikesTab, type LikeTile, type LikesTabData } from '@/features/premium/premium';
+import { useMyProfile } from '@/features/profile/MyProfileProvider';
 import { colors, radii, shadows, spacing } from '@/theme';
 
 function toCard(person: LikeTile): DiscoverCard {
@@ -34,6 +35,7 @@ function toCard(person: LikeTile): DiscoverCard {
     region: null,
     countryCode: null,
     verified: false,
+    mode: undefined,
   };
 }
 
@@ -128,6 +130,8 @@ function Tile({
 
 export default function LikesScreen() {
   const { swipe } = useDiscovery();
+  const { profile } = useMyProfile();
+  const mode = profile.mode === 'friends' ? 'friends' : 'date';
   const [data, setData] = useState<LikesTabData | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -149,6 +153,11 @@ export default function LikesScreen() {
       void load();
     }, [load]),
   );
+
+  // Likes are mode-scoped on the server; refresh when Date/Friends changes.
+  useEffect(() => {
+    void load();
+  }, [mode, load]);
 
   const act = (person: LikeTile, action: SwipeAction, list: 'likedYou' | 'saved') => {
     if (person.blurred) {
@@ -177,9 +186,11 @@ export default function LikesScreen() {
     setBusyId(null);
   };
 
+  const title = mode === 'friends' ? 'Likes · Friends' : 'Likes · Date';
+
   if (loading && !data) {
     return (
-      <TabScreen title="Likes">
+      <TabScreen title={title}>
         <ActivityIndicator color={colors.plum} />
       </TabScreen>
     );
@@ -191,7 +202,7 @@ export default function LikesScreen() {
   const remaining = data?.likesRemaining;
 
   return (
-    <TabScreen title="Likes">
+    <TabScreen title={title}>
       {!premium ? (
         <PinkGradient variant="banner" style={styles.banner}>
           <AppText variant="bodyStrong" color="plum">

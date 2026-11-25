@@ -29,6 +29,7 @@ function CardDeck() {
   const [muted, toggleMute] = useFeedMuted();
   const [focused, setFocused] = useState(true);
   const [deckKey, setDeckKey] = useState(0);
+  const mode = profile.mode === 'friends' ? 'friends' : 'date';
 
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
@@ -45,6 +46,13 @@ function CardDeck() {
     if (status === 'idle') load({ reset: true });
   }, [status, load]);
 
+  // Switching Date ↔ Friends rebuilds the deck for that mode only.
+  useEffect(() => {
+    if (status === 'idle') return;
+    void load({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when mode changes
+  }, [mode]);
+
   useEffect(() => {
     if (status === 'ready' && !exhausted && cards.length > 0 && cards.length <= REFILL_WHEN_LEFT) load();
   }, [status, exhausted, cards.length, load]);
@@ -60,7 +68,7 @@ function CardDeck() {
 
   if (!top) {
     return (
-      <DiscoverShell place={profile.location?.city} distanceKm={preferences.maxDistanceKm}>
+      <DiscoverShell place={profile.location?.city} distanceKm={preferences.maxDistanceKm} mode={mode}>
         {status === 'loading' || status === 'idle' ? (
           <ActivityIndicator color={colors.plum} />
         ) : status === 'error' ? (
@@ -90,7 +98,7 @@ function CardDeck() {
       <SafeAreaView style={styles.root} edges={['top']}>
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <AppText variant="heading">Discover</AppText>
+            <AppText variant="heading">{mode === 'friends' ? 'Discover · Friends' : 'Discover · Date'}</AppText>
             <AppText variant="caption" color="textMuted">
               {profile.location?.city ?? 'Near you'} · within{' '}
               {formatDistance(preferences.maxDistanceKm ?? DISTANCE_DEFAULT_KM)}
@@ -147,10 +155,12 @@ function CardDeck() {
 function DiscoverShell({
   place,
   distanceKm,
+  mode = 'date',
   children,
 }: {
   place?: string;
   distanceKm?: number;
+  mode?: 'date' | 'friends';
   children: ReactNode;
 }) {
   return (
@@ -159,7 +169,7 @@ function DiscoverShell({
       <SafeAreaView style={styles.root} edges={['top']}>
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <AppText variant="heading">Discover</AppText>
+            <AppText variant="heading">{mode === 'friends' ? 'Discover · Friends' : 'Discover · Date'}</AppText>
             <AppText variant="caption" color="textMuted">
               {place ?? 'Near you'} · within {formatDistance(distanceKm ?? DISTANCE_DEFAULT_KM)}
             </AppText>

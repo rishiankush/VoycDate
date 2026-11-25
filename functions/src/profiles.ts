@@ -49,6 +49,7 @@ export const getMatchProfile = onCall(async (request) => {
       region: card.region ?? null,
       countryCode: card.countryCode ?? null,
       verified: Boolean(card.verified),
+      mode: card.mode === 'friends' ? 'friends' : 'date',
     },
   };
 });

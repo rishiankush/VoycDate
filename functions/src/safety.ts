@@ -1,7 +1,7 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
-import { matchIdFor } from './swipe';
+import { matchIdsForPair } from './swipe';
 import { db, requireUid } from './shared';
 
 const MEDIA_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -72,11 +72,12 @@ export const blockUser = onCall(async (request) => {
   });
   await batch.commit();
 
-  const id = matchId ?? matchIdFor(uid, targetId);
-  const matchRef = firestore.doc(`matches/${id}`);
-  const matchSnap = await matchRef.get();
-  if (matchSnap.exists && matchSnap.data()?.members?.includes(uid) && matchSnap.data()?.status === 'active') {
-    await setMatchEnded(id, uid, 'blocked', uid);
+  const ids = matchId ? [matchId] : matchIdsForPair(uid, targetId);
+  for (const id of ids) {
+    const matchSnap = await firestore.doc(`matches/${id}`).get();
+    if (matchSnap.exists && matchSnap.data()?.members?.includes(uid) && matchSnap.data()?.status === 'active') {
+      await setMatchEnded(id, uid, 'blocked', uid);
+    }
   }
 
   return { ok: true };

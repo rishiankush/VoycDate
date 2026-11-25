@@ -8,6 +8,7 @@ import { useSession } from '@/features/auth/SessionProvider';
 import { useMatches, type Match } from '@/features/matches/useMatches';
 import { EmptyCard, TabScreen } from '@/features/navigation/TabScreen';
 import { clock } from '@/features/discover/labels';
+import { useMyProfile } from '@/features/profile/MyProfileProvider';
 import { colors, fontFamily, radii, shadows, spacing } from '@/theme';
 
 function hoursLeft(match: Match) {
@@ -41,18 +42,25 @@ function stageLine(match: Match, uid: string) {
 export default function ConnectionsScreen() {
   const { user } = useSession();
   const uid = user?.uid ?? '';
+  const { profile } = useMyProfile();
   const { matches, loading } = useMatches();
+  const mode = profile.mode === 'friends' ? 'friends' : 'date';
+  const visible = matches.filter((m) => (m.mode ?? 'date') === mode);
 
   return (
-    <TabScreen title="Connections">
-      {!loading && matches.length === 0 ? (
+    <TabScreen title={mode === 'friends' ? 'Connections · Friends' : 'Connections · Date'}>
+      {!loading && visible.length === 0 ? (
         <EmptyCard
           icon={<MessagesSquare size={36} color={colors.pinkBorderStrong} />}
-          title="No matches yet"
-          body="When you and someone both like each other, you’ll find them here."
+          title={mode === 'friends' ? 'No friend matches yet' : 'No matches yet'}
+          body={
+            mode === 'friends'
+              ? 'When you and someone both like each other in Friends mode, you’ll find them here.'
+              : 'When you and someone both like each other, you’ll find them here.'
+          }
         />
       ) : null}
-      {matches.map((match) => {
+      {visible.map((match) => {
         const otherId = match.members.find((m) => m !== uid) ?? '';
         const other = match.people[otherId];
         const yourTurn = match.stage === 'awaiting_first_voice' && match.firstSenderId === uid;

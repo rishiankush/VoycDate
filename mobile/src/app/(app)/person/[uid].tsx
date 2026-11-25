@@ -82,7 +82,8 @@ export default function PersonScreen() {
     swipe(card, action);
   };
 
-  const intent = intentLabel(card.intent);
+  const isFriends = card.mode === 'friends';
+  const intent = isFriends ? null : intentLabel(card.intent);
   const photos = card.photos;
   const info = basics(card);
 
@@ -110,6 +111,7 @@ export default function PersonScreen() {
           ) : null}
         </View>
 
+        {isFriends ? <Tags title="Here for" items={['Friends']} highlight /> : null}
         {intent ? <Tags title="Here for" items={[intent]} highlight /> : null}
         {card.bio ? (
           <Block title="About me">

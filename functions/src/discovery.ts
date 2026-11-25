@@ -72,9 +72,19 @@ export const getDiscoveryFeed = onCall(async (request) => {
   exclude.add(uid);
   for (const id of await blockedIds(uid)) exclude.add(id);
 
-  let [meSnap, prefsSnap] = await firestore.getAll(firestore.doc(`discovery/${uid}`), firestore.doc(`preferences/${uid}`));
+  let [meSnap, prefsSnap, profileSnap] = await firestore.getAll(
+    firestore.doc(`discovery/${uid}`),
+    firestore.doc(`preferences/${uid}`),
+    firestore.doc(`profiles/${uid}`),
+  );
   // Accounts created before the sync triggers existed have no discovery record yet.
   if (!meSnap.exists) {
+    await rebuildDiscovery(uid);
+    meSnap = await firestore.doc(`discovery/${uid}`).get();
+  }
+  // Mode switch can race the discovery sync trigger — rebuild so the feed matches Profile.
+  const profileMode = profileSnap.data()?.mode === 'friends' ? 'friends' : 'date';
+  if (meSnap.exists && (meSnap.data()?.mode ?? 'date') !== profileMode) {
     await rebuildDiscovery(uid);
     meSnap = await firestore.doc(`discovery/${uid}`).get();
   }
@@ -89,12 +99,13 @@ export const getDiscoveryFeed = onCall(async (request) => {
   const myDistanceKm: number = prefs.maxDistanceKm ?? me.maxDistanceKm;
   const myAge = ageFromBirthDate(me.birthDate);
   const center: [number, number] = [me.lat, me.lng];
+  const myMode = profileMode;
 
   const snapshots = await Promise.all(
     geohashQueryBounds(center, myDistanceKm * 1000).map(([start, end]) =>
       firestore
         .collection('discovery')
-        .where('mode', '==', me.mode)
+        .where('mode', '==', myMode)
         .where('active', '==', true)
         .orderBy('geohash')
         .startAt(start)

@@ -19,6 +19,8 @@ export type DiscoverCard = {
   region: string | null;
   countryCode: string | null;
   verified: boolean;
+  /** Date vs Friends — only same-mode people appear in each feed. */
+  mode?: 'date' | 'friends';
 };
 
 export type SwipeAction = 'like' | 'pass' | 'save';

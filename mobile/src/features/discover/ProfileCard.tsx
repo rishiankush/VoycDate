@@ -153,7 +153,8 @@ export function ProfileCard({
   }));
 
   const cover = video?.posterUrl ?? card.photos[0]?.url ?? null;
-  const intent = intentLabel(card.intent);
+  const isFriends = card.mode === 'friends';
+  const intent = isFriends ? null : intentLabel(card.intent);
 
   const content = (
     <Animated.View
@@ -224,6 +225,13 @@ export function ProfileCard({
         <AppText variant="body" color="white">
           {placeLine(card)}
         </AppText>
+        {isFriends ? (
+          <View style={styles.intentChip}>
+            <AppText variant="label" color="plum">
+              Friends
+            </AppText>
+          </View>
+        ) : null}
         {intent ? (
           <View style={styles.intentChip}>
             <AppText variant="label" color="plum">

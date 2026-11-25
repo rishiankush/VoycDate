@@ -31,6 +31,7 @@ export function publicCard(profile: DocumentData) {
     region: profile.location?.region ?? null,
     countryCode: profile.location?.countryCode ?? null,
     verified: profile.verification?.status === 'approved',
+    mode: profile.mode === 'friends' ? 'friends' : 'date',
   };
 }
 

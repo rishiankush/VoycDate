@@ -7,7 +7,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText, Button, GlowBackground, IconButton, PinkGradient } from '@/components/ui';
 import { useSession } from '@/features/auth/SessionProvider';
+import { useDiscovery } from '@/features/discover/DiscoveryProvider';
 import { placeLabel } from '@/features/location/deviceLocation';
+import type { Mode } from '@/features/onboarding/types';
 import { ageFromBirthDate } from '@/features/profile/age';
 import { profileCompleteness } from '@/features/profile/completeness';
 import { useMyProfile } from '@/features/profile/MyProfileProvider';
@@ -22,14 +24,17 @@ const PREMIUM_PERKS = [
 
 export default function ProfileScreen() {
   const { record } = useSession();
-  const { profile, paused, setPaused } = useMyProfile();
+  const { profile, paused, setPaused, setMode } = useMyProfile();
+  const { load } = useDiscovery();
   const [pausing, setPausing] = useState(false);
+  const [switchingMode, setSwitchingMode] = useState(false);
   const photo = profile.photos?.[0];
   const { percent } = profileCompleteness(profile);
   const age = record?.birthDate ? ageFromBirthDate(record.birthDate) : null;
   const isPremium = Boolean(record?.premium?.active);
   const verification = profile.verification?.status ?? 'none';
   const isVerified = verification === 'approved';
+  const mode: Mode = profile.mode === 'friends' ? 'friends' : 'date';
 
   const togglePause = async () => {
     setPausing(true);
@@ -39,6 +44,19 @@ export default function ProfileScreen() {
       Alert.alert('Couldn’t update', 'Check your connection and try again.');
     } finally {
       setPausing(false);
+    }
+  };
+
+  const switchMode = async (next: Mode) => {
+    if (next === mode || switchingMode) return;
+    setSwitchingMode(true);
+    try {
+      await setMode(next);
+      await load({ reset: true });
+    } catch {
+      Alert.alert('Couldn’t switch mode', 'Check your connection and try again.');
+    } finally {
+      setSwitchingMode(false);
     }
   };
 
@@ -96,6 +114,37 @@ export default function ProfileScreen() {
                 </AppText>
               </Pressable>
             </View>
+          </View>
+
+          <View style={styles.modeCard}>
+            <AppText variant="label" color="textMuted">
+              You’re browsing
+            </AppText>
+            <View style={styles.modeRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: mode === 'date' }}
+                disabled={switchingMode}
+                onPress={() => switchMode('date')}
+                style={[styles.modeChip, mode === 'date' && styles.modeChipActive]}>
+                <AppText variant="bodyStrong" color={mode === 'date' ? 'white' : 'plum'}>
+                  Date
+                </AppText>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: mode === 'friends' }}
+                disabled={switchingMode}
+                onPress={() => switchMode('friends')}
+                style={[styles.modeChip, mode === 'friends' && styles.modeChipActive]}>
+                <AppText variant="bodyStrong" color={mode === 'friends' ? 'white' : 'plum'}>
+                  Friends
+                </AppText>
+              </Pressable>
+            </View>
+            <AppText variant="caption" color="textMuted">
+              Matches stay separate. You’ll only see people in the same mode.
+            </AppText>
           </View>
 
           <Pressable
@@ -257,6 +306,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
+  },
+  modeCard: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.white,
+    ...shadows.card,
+  },
+  modeRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  modeChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.pinkBorder,
+    backgroundColor: colors.pinkTint,
+  },
+  modeChipActive: {
+    backgroundColor: colors.plum,
+    borderColor: colors.plum,
   },
   verifyRow: {
     flexDirection: 'row',

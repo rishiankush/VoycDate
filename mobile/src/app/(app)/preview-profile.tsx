@@ -110,7 +110,8 @@ export default function PreviewProfileScreen() {
             </View>
           </View>
 
-          {intent && profile.mode === 'date' ? <Tags title="Here for" items={[intent]} highlight /> : null}
+          {profile.mode === 'friends' ? <Tags title="Here for" items={['Friends']} highlight /> : null}
+          {intent && profile.mode !== 'friends' ? <Tags title="Here for" items={[intent]} highlight /> : null}
           {profile.bio ? (
             <Block title="About me">
               <AppText variant="bodyLarge" color="text">

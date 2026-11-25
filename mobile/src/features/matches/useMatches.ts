@@ -11,6 +11,8 @@ export type Match = {
   id: string;
   members: string[];
   people: Record<string, { firstName: string; photoUrl: string | null }>;
+  /** Date vs Friends — Connections filters to the active profile mode. */
+  mode?: 'date' | 'friends';
   firstSenderId: string;
   stage: MatchStage;
   status: 'active' | 'unmatched' | 'blocked' | 'expired';

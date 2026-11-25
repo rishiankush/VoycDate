@@ -31,10 +31,11 @@ export async function readDailyLikeLimit() {
 export const getLikesTab = onCall(async (request) => {
   const uid = requireUid(request);
   const firestore = db();
-  const [userSnap, likesSnap, savedSnap, limit] = await Promise.all([
+  const [userSnap, likesSnap, savedSnap, profileSnap, limit] = await Promise.all([
     firestore.doc(`users/${uid}`).get(),
-    firestore.collection(`likesReceived/${uid}/from`).orderBy('createdAt', 'desc').limit(50).get(),
-    firestore.collection(`swipes/${uid}/outgoing`).where('action', '==', 'save').limit(50).get(),
+    firestore.collection(`likesReceived/${uid}/from`).orderBy('createdAt', 'desc').limit(80).get(),
+    firestore.collection(`swipes/${uid}/outgoing`).where('action', '==', 'save').limit(80).get(),
+    firestore.doc(`profiles/${uid}`).get(),
     readDailyLikeLimit(),
   ]);
 
@@ -43,9 +44,16 @@ export const getLikesTab = onCall(async (request) => {
   const dayKey = likesDayKey();
   const quota = user.likesQuota;
   const usedToday = quota?.dayKey === dayKey ? Number(quota.count) || 0 : 0;
+  const mode = profileSnap.data()?.mode === 'friends' ? 'friends' : 'date';
 
-  const likerIds = likesSnap.docs.map((d) => d.id);
-  const savedIds = savedSnap.docs.map((d) => d.id);
+  const likerIds = likesSnap.docs
+    .filter((d) => (d.data().mode ?? 'date') === mode)
+    .map((d) => (typeof d.data().uid === 'string' ? d.data().uid : d.id.replace(/_(date|friends)$/, '')))
+    .filter(Boolean) as string[];
+  const savedIds = savedSnap.docs
+    .filter((d) => (d.data().mode ?? 'date') === mode)
+    .map((d) => (typeof d.data().targetId === 'string' ? d.data().targetId : d.id.replace(/_(date|friends)$/, '')))
+    .filter(Boolean) as string[];
 
   const discoveryIds = [...new Set([...likerIds, ...(premium || savedIds.length ? savedIds : [])])];
   const discoverySnaps =
