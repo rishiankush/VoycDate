@@ -3,9 +3,9 @@ import { router } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
 import { MessagesSquare, Sparkles } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
-import { AppText } from '@/components/ui';
+import { AppText, MessageSheet, type MessageSheetState } from '@/components/ui';
 import { useSession } from '@/features/auth/SessionProvider';
 import { useMatches, type Match } from '@/features/matches/useMatches';
 import { EmptyCard, TabScreen } from '@/features/navigation/TabScreen';
@@ -28,8 +28,8 @@ function stageLine(match: Match, uid: string) {
   const other = match.people[match.members.find((m) => m !== uid) ?? '']?.firstName ?? 'them';
   if (match.stage === 'spark_pending') {
     return match.sparkedBy === uid
-      ? `Spark sent · waiting for ${other} to accept`
-      : `${other} sent you a Spark · Accept to connect`;
+      ? `Spark sent · waiting for ${other} to start a conversation`
+      : `${other} Sparks you · Start a conversation?`;
   }
   if (match.stage === 'awaiting_first_voice') {
     const left = hoursLeft(match);
@@ -58,6 +58,7 @@ export default function ConnectionsScreen() {
   const { profile } = useMyProfile();
   const { matches, loading } = useMatches();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<MessageSheetState>(null);
   const mode = profile.mode === 'friends' ? 'friends' : 'date';
   const visible = matches.filter((m) => (m.mode ?? 'date') === mode);
 
@@ -69,7 +70,10 @@ export default function ConnectionsScreen() {
         router.push({ pathname: '/chat/[matchId]', params: { matchId: match.id } });
       }
     } catch {
-      Alert.alert('Couldn’t update', 'Check your connection and try again.');
+      setNotice({
+        title: 'Couldn’t update',
+        body: 'Check your connection and try again.',
+      });
     } finally {
       setBusyId(null);
     }
@@ -86,8 +90,8 @@ export default function ConnectionsScreen() {
           title={mode === 'friends' ? 'No friend matches yet' : 'No matches yet'}
           body={
             mode === 'friends'
-              ? 'When you and someone both like each other in Friends mode, you’ll find them here.'
-              : 'When you and someone both like each other, you’ll find them here.'
+              ? 'Mutual likes and Sparks in Friends mode show up here.'
+              : 'Mutual likes and Sparks show up here — accept a Spark to start chatting.'
           }
         />
       ) : null}
@@ -155,7 +159,7 @@ export default function ConnectionsScreen() {
                   <>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`Decline Spark from ${other?.firstName ?? 'them'}`}
+                      accessibilityLabel={`Pass on Spark from ${other?.firstName ?? 'them'}`}
                       onPress={() => void onSparkRespond(match, false)}
                       style={({ pressed }) => [styles.sparkBtn, styles.declineBtn, pressed && styles.rowPressed]}>
                       <AppText variant="label" color="plum">
@@ -164,11 +168,11 @@ export default function ConnectionsScreen() {
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`Accept Spark from ${other?.firstName ?? 'them'}`}
+                      accessibilityLabel={`Start conversation with ${other?.firstName ?? 'them'}`}
                       onPress={() => void onSparkRespond(match, true)}
                       style={({ pressed }) => [styles.sparkBtn, styles.acceptBtn, pressed && styles.rowPressed]}>
                       <AppText variant="label" color="white">
-                        Accept
+                        Start chat
                       </AppText>
                     </Pressable>
                   </>
@@ -178,6 +182,7 @@ export default function ConnectionsScreen() {
           </View>
         );
       })}
+      <MessageSheet notice={notice} onClose={() => setNotice(null)} />
     </TabScreen>
   );
 }

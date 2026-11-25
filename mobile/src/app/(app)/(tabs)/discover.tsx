@@ -13,6 +13,7 @@ import { SparkUpsellSheet } from '@/features/discover/SparkUpsellSheet';
 import { SwipeActions } from '@/features/discover/SwipeActions';
 import type { DiscoverCard, SwipeAction } from '@/features/discover/types';
 import { useFeedMuted } from '@/features/discover/useFeedMuted';
+import { useWarmDiscoverVideos } from '@/features/discover/useWarmDiscoverVideos';
 import { DISTANCE_DEFAULT_KM } from '@/features/onboarding/options';
 import { formatDistance } from '@/features/onboarding/units';
 import { useMyProfile } from '@/features/profile/MyProfileProvider';
@@ -72,6 +73,8 @@ function CardDeck() {
 
   const top = cards[0];
   const next = cards[1];
+  // Buffer the next intros (and posters) before they become the top card.
+  useWarmDiscoverVideos(cards);
 
   const commitAction = (card: DiscoverCard, action: SwipeAction) => {
     animating.current = false;

@@ -72,14 +72,54 @@ export const getLikesTab = onCall(async (request) => {
   const usedToday = quota?.dayKey === dayKey ? Number(quota.count) || 0 : 0;
   const mode = profileSnap.data()?.mode === 'friends' ? 'friends' : 'date';
 
-  const likerIds = likesSnap.docs
-    .filter((d) => (d.data().mode ?? 'date') === mode)
-    .map((d) => (typeof d.data().uid === 'string' ? d.data().uid : d.id.replace(/_(date|friends)$/, '')))
-    .filter(Boolean) as string[];
-  const savedIds = savedSnap.docs
-    .filter((d) => (d.data().mode ?? 'date') === mode)
-    .map((d) => (typeof d.data().targetId === 'string' ? d.data().targetId : d.id.replace(/_(date|friends)$/, '')))
-    .filter(Boolean) as string[];
+  const resolveLikerId = (d: FirebaseFirestore.QueryDocumentSnapshot) => {
+    const data = d.data();
+    if (typeof data.uid === 'string' && data.uid) return data.uid;
+    return d.id.replace(/_(date|friends)$/, '');
+  };
+
+  // Mode-scoped + legacy docs can both exist for the same person — keep one tile.
+  const rawLikerIds = [
+    ...new Set(
+      likesSnap.docs
+        .filter((d) => (d.data().mode ?? 'date') === mode)
+        .map(resolveLikerId)
+        .filter((id): id is string => Boolean(id) && id !== uid),
+    ),
+  ];
+  const savedIds = [
+    ...new Set(
+      savedSnap.docs
+        .filter((d) => (d.data().mode ?? 'date') === mode)
+        .map((d) =>
+          typeof d.data().targetId === 'string' && d.data().targetId
+            ? d.data().targetId
+            : d.id.replace(/_(date|friends)$/, ''),
+        )
+        .filter((id): id is string => Boolean(id) && id !== uid),
+    ),
+  ];
+
+  // Drop anyone you've already liked / passed / Sparks, or already matched with.
+  const decisionRefs = rawLikerIds.flatMap((id) => [
+    firestore.doc(`swipes/${uid}/outgoing/${id}_${mode}`),
+    firestore.doc(`swipes/${uid}/outgoing/${id}`),
+    firestore.doc(`matches/${[uid, id].sort().join('_')}_${mode}`),
+  ]);
+  const decisionSnaps: FirebaseFirestore.DocumentSnapshot[] = [];
+  for (let i = 0; i < decisionRefs.length; i += 80) {
+    decisionSnaps.push(...(await firestore.getAll(...decisionRefs.slice(i, i + 80))));
+  }
+  const decidedAway = new Set<string>();
+  rawLikerIds.forEach((id, i) => {
+    const outgoing = decisionSnaps[i * 3];
+    const legacy = decisionSnaps[i * 3 + 1];
+    const match = decisionSnaps[i * 3 + 2];
+    const prior = outgoing.exists ? outgoing.data()?.action : legacy.exists ? legacy.data()?.action : null;
+    if (prior === 'like' || prior === 'pass' || prior === 'spark') decidedAway.add(id);
+    if (match.exists && match.data()?.status === 'active') decidedAway.add(id);
+  });
+  const likerIds = rawLikerIds.filter((id) => !decidedAway.has(id));
 
   const discoveryIds = [...new Set([...likerIds, ...(premium || savedIds.length ? savedIds : [])])];
   const discoverySnaps =
@@ -88,44 +128,53 @@ export const getLikesTab = onCall(async (request) => {
       : [];
   const discoveryById = new Map(discoverySnaps.map((snap, i) => [discoveryIds[i], snap.data()]));
 
-  const likedYou = likerIds.map((id) => {
+  const likedYou = likerIds.flatMap((id) => {
     const doc = discoveryById.get(id);
     const card = doc?.card;
-    const photoUrl = card?.photos?.[0]?.url ?? card?.video?.posterUrl ?? null;
+    // Skip ghost likes (no discovery / empty card) — these showed up as blank "Someone" tiles.
+    if (!doc?.active || !card?.firstName) return [];
+    const photoUrl = card.photos?.[0]?.url ?? card.video?.posterUrl ?? null;
     // Free users still get a photo URL so the client can show a real blur (not a solid block).
     if (!premium) {
-      return {
-        uid: id,
-        firstName: card?.firstName ? `${String(card.firstName).slice(0, 1)}.` : 'Someone',
-        photoUrl,
-        blurred: true,
-        city: null,
-        age: null,
-      };
+      return [
+        {
+          uid: id,
+          firstName: `${String(card.firstName).slice(0, 1)}.`,
+          photoUrl,
+          blurred: true,
+          city: null,
+          age: null,
+        },
+      ];
     }
-    const birthDate = doc?.birthDate as string | undefined;
-    return {
-      uid: id,
-      firstName: card?.firstName ?? 'Someone',
-      photoUrl,
-      blurred: false,
-      city: card?.city ?? null,
-      age: birthDate ? ageFromBirthDate(birthDate) : null,
-    };
+    const birthDate = doc.birthDate as string | undefined;
+    return [
+      {
+        uid: id,
+        firstName: card.firstName,
+        photoUrl,
+        blurred: false,
+        city: card.city ?? null,
+        age: birthDate ? ageFromBirthDate(birthDate) : null,
+      },
+    ];
   });
 
-  const saved = savedIds.map((id) => {
+  const saved = savedIds.flatMap((id) => {
     const doc = discoveryById.get(id);
     const card = doc?.card;
-    const birthDate = doc?.birthDate as string | undefined;
-    return {
-      uid: id,
-      firstName: card?.firstName ?? 'Someone',
-      photoUrl: card?.photos?.[0]?.url ?? card?.video?.posterUrl ?? null,
-      blurred: false,
-      city: card?.city ?? null,
-      age: birthDate ? ageFromBirthDate(birthDate) : null,
-    };
+    if (!doc?.active || !card?.firstName) return [];
+    const birthDate = doc.birthDate as string | undefined;
+    return [
+      {
+        uid: id,
+        firstName: card.firstName,
+        photoUrl: card.photos?.[0]?.url ?? card.video?.posterUrl ?? null,
+        blurred: false,
+        city: card.city ?? null,
+        age: birthDate ? ageFromBirthDate(birthDate) : null,
+      },
+    ];
   });
 
   return {
@@ -133,7 +182,7 @@ export const getLikesTab = onCall(async (request) => {
     dailyLimit: limit,
     likesUsedToday: usedToday,
     likesRemaining: premium ? null : Math.max(0, limit - usedToday),
-    likedYouCount: likerIds.length,
+    likedYouCount: likedYou.length,
     likedYou,
     saved,
   };

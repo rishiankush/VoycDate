@@ -21,6 +21,7 @@ import { colors, radii, shadows, spacing } from '@/theme';
 import { intentLabel, nameAgeLine, placeLine } from './labels';
 import { PhotoGradient } from './PhotoGradient';
 import type { DiscoverCard, SwipeAction } from './types';
+import { FAST_INTRO_BUFFER, videoSource } from './useWarmDiscoverVideos';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
@@ -32,8 +33,8 @@ function setMuted(player: VideoPlayer, muted: boolean) {
   player.muted = muted;
 }
 
-function syncPlayback(player: VideoPlayer, active: boolean) {
-  if (active) {
+function syncPlayback(player: VideoPlayer, shouldPlay: boolean) {
+  if (shouldPlay) {
     player.play();
     return;
   }
@@ -63,8 +64,12 @@ export const ProfileCard = forwardRef<ProfileCardHandle, ProfileCardProps>(funct
 ) {
   const video = card.video;
   const [showCover, setShowCover] = useState(true);
-  const player = useVideoPlayer(active && video ? video.url : null, (p) => {
+  // Always attach a source when this card has video so expo-video can hit the warm cache
+  // from useWarmDiscoverVideos (even the behind card buffers quietly).
+  const player = useVideoPlayer(video ? videoSource(video.url) : null, (p) => {
     p.loop = true;
+    p.muted = true;
+    p.bufferOptions = { ...FAST_INTRO_BUFFER };
   });
 
   const tx = useSharedValue(0);
@@ -76,8 +81,25 @@ export const ProfileCard = forwardRef<ProfileCardHandle, ProfileCardProps>(funct
     setShowCover(true);
   }, [card.uid, video?.url]);
 
-  useEffect(() => setMuted(player, muted), [player, muted]);
-  useEffect(() => syncPlayback(player, active && !behind), [player, active, behind]);
+  useEffect(() => setMuted(player, muted || behind || !active), [player, muted, behind, active]);
+  // Behind cards keep a player attached (for cache) but don’t compete with the warmup buffer.
+  useEffect(
+    () => syncPlayback(player, Boolean(active && !behind && video)),
+    [player, active, behind, video],
+  );
+
+  // Keep poster until the player can actually play — first frame alone can still look soft.
+  useEffect(() => {
+    if (!video || behind || !active) return;
+    if (player.status === 'readyToPlay') {
+      setShowCover(false);
+      return;
+    }
+    const sub = player.addListener('statusChange', ({ status }) => {
+      if (status === 'readyToPlay') setShowCover(false);
+    });
+    return () => sub.remove();
+  }, [player, video, behind, active]);
 
   const commit = (action: SwipeAction) => {
     onAction(action);
@@ -189,7 +211,7 @@ export const ProfileCard = forwardRef<ProfileCardHandle, ProfileCardProps>(funct
       accessibilityLabel={`${nameAgeLine(card)}. ${placeLine(card)}. Open full profile`}
       style={[styles.card, behind && styles.cardBehind, cardStyle]}
       pointerEvents={behind ? 'none' : 'auto'}>
-      {active && video ? (
+      {active && !behind && video ? (
         <VideoView
           player={player}
           style={StyleSheet.absoluteFill}
@@ -201,7 +223,14 @@ export const ProfileCard = forwardRef<ProfileCardHandle, ProfileCardProps>(funct
       ) : null}
 
       {(showCover || !video || behind) && cover ? (
-        <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} contentFit="cover" pointerEvents="none" />
+        <Image
+          source={{ uri: cover }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          recyclingKey={cover}
+          cachePolicy="memory-disk"
+          pointerEvents="none"
+        />
       ) : null}
       {!video && !cover ? <View style={[StyleSheet.absoluteFill, styles.fallback]} pointerEvents="none" /> : null}
 

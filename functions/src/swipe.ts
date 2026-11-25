@@ -40,6 +40,27 @@ function personSummary(card: FirebaseFirestore.DocumentData | undefined) {
   };
 }
 
+function isInterestAction(action: unknown) {
+  return action === 'like' || action === 'spark';
+}
+
+/** True if the other person already liked / Sparks you (swipe docs or Likes tab). */
+function theyAlreadyInterested(args: {
+  mode: Mode;
+  theirSwipe: FirebaseFirestore.DocumentSnapshot;
+  legacyTheirs: FirebaseFirestore.DocumentSnapshot;
+  likedMode: FirebaseFirestore.DocumentSnapshot;
+  likedLegacy: FirebaseFirestore.DocumentSnapshot;
+}) {
+  const { mode, theirSwipe, legacyTheirs, likedMode, likedLegacy } = args;
+  if (theirSwipe.exists && isInterestAction(theirSwipe.data()?.action)) return true;
+  if (mode === 'date' && legacyTheirs.exists && isInterestAction(legacyTheirs.data()?.action)) return true;
+  // Likes tab is sourced from likesReceived — seeds often write that even when swipe ids differ.
+  if (likedMode.exists) return true;
+  if (mode === 'date' && likedLegacy.exists) return true;
+  return false;
+}
+
 export const swipe = onCall(async (request) => {
   const uid = requireUid(request);
   const targetId = request.data?.targetId;
@@ -73,16 +94,31 @@ export const swipe = onCall(async (request) => {
     const matchId = matchIdFor(uid, targetId, mode);
     const matchRef = firestore.doc(`matches/${matchId}`);
 
-    const [theirSwipe, existingMatch, existingOutgoing, legacyOutgoing, legacyTheirs] = await tx.getAll(
-      theirs,
-      matchRef,
-      outgoing,
-      // Pre-Friends docs used bare targetId; only block date-mode retries on those.
-      firestore.doc(`swipes/${uid}/outgoing/${targetId}`),
-      firestore.doc(`swipes/${targetId}/outgoing/${uid}`),
-    );
+    const [theirSwipe, existingMatch, existingOutgoing, legacyOutgoing, legacyTheirs, likedMode, likedLegacy] =
+      await tx.getAll(
+        theirs,
+        matchRef,
+        outgoing,
+        // Pre-Friends docs used bare targetId; only block date-mode retries on those.
+        firestore.doc(`swipes/${uid}/outgoing/${targetId}`),
+        firestore.doc(`swipes/${targetId}/outgoing/${uid}`),
+        // Likes you (mode-scoped + legacy seed path without mode suffix).
+        firestore.doc(`likesReceived/${uid}/from/${swipeDocId(targetId, mode)}`),
+        firestore.doc(`likesReceived/${uid}/from/${targetId}`),
+      );
 
-    if (existingOutgoing.exists || (mode === 'date' && legacyOutgoing.exists)) {
+    const theyLiked = theyAlreadyInterested({ mode, theirSwipe, legacyTheirs, likedMode, likedLegacy });
+    const priorOutgoing = existingOutgoing.exists
+      ? existingOutgoing
+      : mode === 'date' && legacyOutgoing.exists
+        ? legacyOutgoing
+        : null;
+    const priorAction = priorOutgoing?.data()?.action as SwipeAction | undefined;
+    const alreadySwiped = Boolean(priorOutgoing);
+    // Old "Save" was only a bookmark — Spark / Like must still be allowed to create a match.
+    const canReplaceSave = priorAction === 'save' && (action === 'spark' || action === 'like');
+
+    if (alreadySwiped && !canReplaceSave && !(action === 'spark' && theyLiked && priorAction === 'spark')) {
       return { matched: false as const, alreadySwiped: true as const };
     }
 
@@ -111,23 +147,73 @@ export const swipe = onCall(async (request) => {
       if (!isPremium(user)) {
         throw new HttpsError('permission-denied', 'Spark is a Premium perk.');
       }
-      const weekKey = sparksWeekKey();
-      const quota = user.sparkQuota;
-      const used = quota?.weekKey === weekKey ? Number(quota.count) || 0 : 0;
-      if (used >= weeklySparks) {
-        throw new HttpsError(
-          'resource-exhausted',
-          `You’ve used your ${weeklySparks} Sparks for this week.`,
+      // Don't burn a weekly Spark when we're only upgrading a stuck pending request.
+      const upgradingPendingSpark = alreadySwiped && priorAction === 'spark' && theyLiked;
+      if (!upgradingPendingSpark) {
+        const weekKey = sparksWeekKey();
+        const quota = user.sparkQuota;
+        const used = quota?.weekKey === weekKey ? Number(quota.count) || 0 : 0;
+        if (used >= weeklySparks) {
+          throw new HttpsError(
+            'resource-exhausted',
+            `You’ve used your ${weeklySparks} Sparks for this week.`,
+          );
+        }
+        tx.set(
+          userRef,
+          {
+            sparkQuota: { weekKey, count: used + 1 },
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
         );
       }
+    }
+
+    // They already like you + Spark → instant match (also replaces an old Save bookmark).
+    if (action === 'spark' && theyLiked) {
+      const mySummary = personSummary(me.data()?.card);
+      const theirSummary = personSummary(target.data()?.card);
+      const existing = existingMatch.data();
+      tx.set(outgoing, { action: 'spark', mode, targetId, createdAt: FieldValue.serverTimestamp() });
+      if (mode === 'date' && legacyOutgoing.exists && legacyOutgoing.ref.path !== outgoing.path) {
+        tx.delete(legacyOutgoing.ref);
+      }
+      tx.set(firestore.doc(`likesReceived/${targetId}/from/${swipeDocId(uid, mode)}`), {
+        uid,
+        mode,
+        kind: 'spark',
+        createdAt: FieldValue.serverTimestamp(),
+      });
       tx.set(
-        userRef,
+        matchRef,
         {
-          sparkQuota: { weekKey, count: used + 1 },
-          updatedAt: FieldValue.serverTimestamp(),
+          members: [uid, targetId].sort(),
+          people: { [uid]: mySummary, [targetId]: theirSummary },
+          mode,
+          firstSenderId: uid,
+          sparkedBy: uid,
+          stage: 'awaiting_first_voice',
+          status: 'active',
+          voice: existing?.voice ?? { qualifiedCount: 0, perUser: {} },
+          unread: {},
+          lastMessageAt: existing?.lastMessageAt ?? null,
+          lastMessage: existing?.lastMessage ?? null,
+          createdAt: existing?.createdAt ?? FieldValue.serverTimestamp(),
+          expiresAt: Timestamp.fromMillis(Date.now() + MATCH_EXPIRY_MS),
+          rematchedAt: existingMatch.exists ? FieldValue.serverTimestamp() : null,
         },
         { merge: true },
       );
+      return {
+        matched: true as const,
+        matchId,
+        firstSenderId: uid,
+        other: { uid: targetId, ...theirSummary },
+        meName: mySummary.firstName || 'Someone',
+        otherName: theirSummary.firstName || 'Someone',
+        isNew: !existingMatch.exists || existing?.status !== 'active' || existing?.stage === 'spark_pending',
+      };
     }
 
     tx.set(outgoing, { action, mode, targetId, createdAt: FieldValue.serverTimestamp() });
@@ -138,12 +224,8 @@ export const swipe = onCall(async (request) => {
     const theirSummary = personSummary(target.data()?.card);
     const existing = existingMatch.data();
 
-    // Spark: open a connect request (or full match if they already liked you).
+    // Spark: notify them in Connections. Instant match if they already liked you.
     if (action === 'spark') {
-      const theyLiked =
-        (theirSwipe.exists && theirSwipe.data()?.action === 'like') ||
-        (mode === 'date' && legacyTheirs.exists && legacyTheirs.data()?.action === 'like');
-
       tx.set(firestore.doc(`likesReceived/${targetId}/from/${swipeDocId(uid, mode)}`), {
         uid,
         mode,
@@ -185,6 +267,7 @@ export const swipe = onCall(async (request) => {
         };
       }
 
+      // Pending connect request — both see it in Connections; they Accept to start chatting.
       tx.set(
         matchRef,
         {
@@ -196,7 +279,7 @@ export const swipe = onCall(async (request) => {
           stage: 'spark_pending',
           status: 'active',
           voice: { qualifiedCount: 0, perUser: {} },
-          unread: {},
+          unread: { [targetId]: 1 },
           lastMessageAt: null,
           lastMessage: null,
           createdAt: FieldValue.serverTimestamp(),
@@ -222,15 +305,10 @@ export const swipe = onCall(async (request) => {
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    const mutual =
-      (theirSwipe.exists && (theirSwipe.data()?.action === 'like' || theirSwipe.data()?.action === 'spark')) ||
-      (mode === 'date' &&
-        legacyTheirs.exists &&
-        (legacyTheirs.data()?.action === 'like' || legacyTheirs.data()?.action === 'spark'));
-    if (!mutual) return { matched: false as const };
+    if (!theyLiked) return { matched: false as const };
 
     const firstSenderId =
-      theirSwipe.data()?.action === 'spark' || legacyTheirs.data()?.action === 'spark'
+      theirSwipe.data()?.action === 'spark' || legacyTheirs.data()?.action === 'spark' || likedMode.data()?.kind === 'spark'
         ? targetId
         : (existing?.firstSenderId ?? targetId);
 

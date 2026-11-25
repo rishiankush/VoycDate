@@ -158,8 +158,12 @@ async function clean(db, bucket) {
     }
     const swipes = await db.collection(`swipes/${id}/outgoing`).get();
     for (const s of swipes.docs) {
+      const targetId =
+        typeof s.data()?.targetId === 'string' ? s.data().targetId : String(s.id).replace(/_(date|friends)$/, '');
       writer.delete(s.ref);
-      writer.delete(db.doc(`likesReceived/${s.id}/from/${id}`));
+      writer.delete(db.doc(`likesReceived/${targetId}/from/${id}`));
+      writer.delete(db.doc(`likesReceived/${targetId}/from/${id}_date`));
+      writer.delete(db.doc(`likesReceived/${targetId}/from/${id}_friends`));
     }
   }
   await writer.close();
@@ -244,8 +248,21 @@ async function seed(db, bucket) {
 
     if (p.likesYou) {
       for (const real of users) {
-        batch.set(db.doc(`swipes/${uid}/outgoing/${real.id}`), { action: 'like', mode, createdAt: FieldValue.serverTimestamp() });
-        batch.set(db.doc(`likesReceived/${real.id}/from/${uid}`), { mode, createdAt: FieldValue.serverTimestamp() });
+        // Mode-scoped ids only — dual legacy+scoped docs duplicated Likes tiles.
+        batch.set(db.doc(`swipes/${uid}/outgoing/${real.id}_${mode}`), {
+          action: 'like',
+          mode,
+          targetId: real.id,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        batch.set(db.doc(`likesReceived/${real.id}/from/${uid}_${mode}`), {
+          uid,
+          mode,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        // Drop any leftover legacy docs from older seeds.
+        batch.delete(db.doc(`swipes/${uid}/outgoing/${real.id}`));
+        batch.delete(db.doc(`likesReceived/${real.id}/from/${uid}`));
       }
     }
     await batch.commit();

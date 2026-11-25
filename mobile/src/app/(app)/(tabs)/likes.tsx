@@ -3,9 +3,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Heart, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
-import { AppText, Button, PinkGradient } from '@/components/ui';
+import { AppText, Button, MessageSheet, PinkGradient, type MessageSheetState } from '@/components/ui';
 import { useDiscovery } from '@/features/discover/DiscoveryProvider';
 import type { DiscoverCard, SwipeAction } from '@/features/discover/types';
 import { EmptyCard, TabScreen } from '@/features/navigation/TabScreen';
@@ -52,7 +52,7 @@ function Tile({
   onReveal: () => void;
   onAction: (action: 'like' | 'pass') => void;
 }) {
-  // Premium: Pass + Like on the photo. Free liked-you stays Reveal → paywall.
+  // Premium: Pass + Like only — they already liked you, so Spark would waste a weekly credit.
   const showPremiumActions = premium && !person.blurred;
 
   return (
@@ -135,6 +135,7 @@ export default function LikesScreen() {
   const [data, setData] = useState<LikesTabData | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<MessageSheetState>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -142,7 +143,12 @@ export default function LikesScreen() {
       setData(await fetchLikesTab());
     } catch {
       setData(null);
-      Alert.alert('Couldn’t load likes', 'Check your connection and try again.');
+      setNotice({
+        title: 'Couldn’t load likes',
+        body: 'Check your connection and try again.',
+        primary: { label: 'Try again', onPress: () => void load() },
+        secondary: { label: 'Close', onPress: () => {}, variant: 'secondary' },
+      });
     } finally {
       setLoading(false);
     }
@@ -159,7 +165,7 @@ export default function LikesScreen() {
     void load();
   }, [mode, load]);
 
-  const act = (person: LikeTile, action: SwipeAction) => {
+  const act = (person: LikeTile, action: Extract<SwipeAction, 'like' | 'pass'>) => {
     if (person.blurred) {
       router.push('/(app)/paywall');
       return;
@@ -193,7 +199,9 @@ export default function LikesScreen() {
     );
   }
 
-  const likedYou = data?.likedYou ?? [];
+  const likedYou = [...new Map((data?.likedYou ?? []).map((p) => [p.uid, p])).values()].filter(
+    (p) => p.uid && p.firstName && p.firstName !== 'Someone',
+  );
   const premium = data?.premium ?? false;
   const remaining = data?.likesRemaining;
 
@@ -244,6 +252,8 @@ export default function LikesScreen() {
           ))}
         </View>
       )}
+
+      <MessageSheet notice={notice} onClose={() => setNotice(null)} />
     </TabScreen>
   );
 }
