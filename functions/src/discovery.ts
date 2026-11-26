@@ -4,6 +4,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { distanceBetween, geohashQueryBounds } from 'geofire-common';
 
 import { buildDiscoveryDoc, DEFAULT_DISTANCE_KM, stableStringify } from './discoveryDoc';
+import { isPremium } from './premium';
 import { ageFromBirthDate, db, requireUid, wantsToSee, type ShowMe } from './shared';
 
 const FEED_LIMIT = 20;
@@ -28,10 +29,52 @@ async function rebuildDiscovery(uid: string) {
     firestore.doc(`preferences/${uid}`),
   );
   const next = buildDiscoveryDoc(uid, user, profileSnap.data() ?? {}, prefsSnap.data() ?? {});
+  // Keep an active boost across profile/prefs rebuilds.
+  const boostedUntil = existing.data()?.boostedUntil;
+  if (boostedUntil?.toMillis?.() > Date.now()) {
+    (next as DocumentData).boostedUntil = boostedUntil;
+  }
   const { updatedAt: _updatedAt, ...current } = existing.data() ?? {};
   if (existing.exists && stableStringify(current) === stableStringify(next)) return;
 
   await ref.set({ ...next, updatedAt: FieldValue.serverTimestamp() });
+}
+
+function passesAdvancedFilters(prefs: DocumentData, card: DocumentData) {
+  const advanced = prefs.advanced ?? {};
+  if (advanced.verifiedOnly && !card.verified) return false;
+
+  const height = advanced.heightRange;
+  if (height && typeof height.min === 'number' && typeof height.max === 'number') {
+    if (card.heightCm == null || card.heightCm < height.min || card.heightCm > height.max) return false;
+  }
+
+  const intents = Array.isArray(advanced.intents) ? advanced.intents.filter((x: unknown) => typeof x === 'string') : [];
+  if (intents.length > 0 && (!card.intent || !intents.includes(card.intent))) return false;
+
+  const habits = card.habits ?? {};
+  for (const key of ['drinking', 'smoking', 'exercise'] as const) {
+    const wanted = Array.isArray(advanced[key]) ? advanced[key].filter((x: unknown) => typeof x === 'string') : [];
+    if (wanted.length > 0 && (!habits[key] || !wanted.includes(habits[key]))) return false;
+  }
+
+  const wantKids = Array.isArray(advanced.wantKids)
+    ? advanced.wantKids.filter((x: unknown) => typeof x === 'string')
+    : [];
+  if (wantKids.length > 0 && (!card.family?.wantKids || !wantKids.includes(card.family.wantKids))) return false;
+
+  const religions = Array.isArray(advanced.religions)
+    ? advanced.religions.filter((x: unknown) => typeof x === 'string')
+    : [];
+  if (religions.length > 0 && (!card.beliefs?.religion || !religions.includes(card.beliefs.religion))) {
+    return false;
+  }
+
+  return true;
+}
+
+function isBoosted(value: { toMillis?: () => number } | null | undefined, now = Date.now()) {
+  return Boolean(value?.toMillis?.() && value.toMillis() > now);
 }
 
 function changed(change: Change<DocumentSnapshot> | undefined, pick: (data: DocumentData) => unknown) {
@@ -72,10 +115,11 @@ export const getDiscoveryFeed = onCall(async (request) => {
   exclude.add(uid);
   for (const id of await blockedIds(uid)) exclude.add(id);
 
-  let [meSnap, prefsSnap, profileSnap] = await firestore.getAll(
+  let [meSnap, prefsSnap, profileSnap, userSnap] = await firestore.getAll(
     firestore.doc(`discovery/${uid}`),
     firestore.doc(`preferences/${uid}`),
     firestore.doc(`profiles/${uid}`),
+    firestore.doc(`users/${uid}`),
   );
   // Accounts created before the sync triggers existed have no discovery record yet.
   if (!meSnap.exists) {
@@ -94,12 +138,14 @@ export const getDiscoveryFeed = onCall(async (request) => {
   }
 
   const prefs = prefsSnap.data() ?? {};
+  const premium = isPremium(userSnap.data());
   const myShowMe = (prefs.showMe ?? me.showMe) as ShowMe;
   const myRange = prefs.ageRange ?? me.ageRange;
   const myDistanceKm: number = prefs.maxDistanceKm ?? me.maxDistanceKm;
   const myAge = ageFromBirthDate(me.birthDate);
   const center: [number, number] = [me.lat, me.lng];
   const myMode = profileMode;
+  const now = Date.now();
 
   const snapshots = await Promise.all(
     geohashQueryBounds(center, myDistanceKm * 1000).map(([start, end]) =>
@@ -131,17 +177,21 @@ export const getDiscoveryFeed = onCall(async (request) => {
       const age = ageFromBirthDate(c.birthDate);
       if (age < myRange.min || (myRange.max < 80 && age > myRange.max)) continue;
       if (myAge < c.ageRange.min || (c.ageRange.max < 80 && myAge > c.ageRange.max)) continue;
+      if (premium && !passesAdvancedFilters(prefs, c.card ?? {})) continue;
 
       candidates.push({
         uid: doc.id,
         age: c.showAge === false ? null : age,
         distanceKm: c.showDistance === false ? null : Math.max(1, Math.round(distanceKm)),
+        _boosted: isBoosted(c.boostedUntil, now),
         ...c.card,
       });
     }
   }
-  // Verified profiles rank above others; then nearer first.
+  // Active boosts first, then verified, then nearer.
   candidates.sort((a, b) => {
+    const boostDelta = Number(Boolean(b._boosted)) - Number(Boolean(a._boosted));
+    if (boostDelta) return boostDelta;
     const verifiedDelta = Number(Boolean(b.verified)) - Number(Boolean(a.verified));
     if (verifiedDelta) return verifiedDelta;
     return (a.distanceKm ?? Number.POSITIVE_INFINITY) - (b.distanceKm ?? Number.POSITIVE_INFINITY);
@@ -165,5 +215,7 @@ export const getDiscoveryFeed = onCall(async (request) => {
     });
   }
 
-  return { cards };
+  return {
+    cards: cards.map(({ _boosted: _b, ...card }) => card),
+  };
 });

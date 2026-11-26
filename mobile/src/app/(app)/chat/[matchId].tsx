@@ -221,6 +221,7 @@ export default function ChatScreen() {
           </View>
 
           <FlatList
+            style={styles.flex}
             data={rows}
             keyExtractor={(row) => row.id}
             contentContainerStyle={styles.list}
@@ -368,6 +369,9 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   root: {
+    flex: 1,
+  },
+  flex: {
     flex: 1,
   },
   centered: {

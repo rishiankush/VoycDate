@@ -42,12 +42,27 @@ export default function MatchScreen() {
       </View>
       <View style={styles.actions}>
         {iSendFirst ? (
-          <Button title="Send the first voice note" variant="accent" onPress={() => router.replace({ pathname: '/chat/[matchId]', params: { matchId } })} />
+          <Button
+            title="Send the first voice note"
+            variant="accent"
+            onPress={() => {
+              // Dismiss the match fullScreenModal first — replace-into-chat leaves an
+              // invisible modal layer that swallows every touch on the chat screen.
+              const openChat = () =>
+                router.push({ pathname: '/chat/[matchId]', params: { matchId } });
+              if (router.canDismiss()) {
+                router.dismiss();
+                requestAnimationFrame(openChat);
+              } else {
+                openChat();
+              }
+            }}
+          />
         ) : null}
         <Button
           title="Keep discovering"
           variant={iSendFirst ? 'outlineOnDark' : 'accent'}
-          onPress={() => router.back()}
+          onPress={() => (router.canDismiss() ? router.dismiss() : router.back())}
         />
       </View>
     </Screen>

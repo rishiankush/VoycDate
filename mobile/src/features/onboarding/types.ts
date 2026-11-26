@@ -77,6 +77,18 @@ export type NotificationPrefs = {
   expiry?: boolean;
 };
 
+/** Premium-only Discover filters (ignored for free accounts on the server). */
+export type AdvancedFilters = {
+  heightRange?: { min: number; max: number };
+  intents?: string[];
+  drinking?: string[];
+  smoking?: string[];
+  exercise?: string[];
+  wantKids?: string[];
+  religions?: string[];
+  verifiedOnly?: boolean;
+};
+
 export type Preferences = {
   showMe?: ShowMe;
   ageRange?: { min: number; max: number };
@@ -86,4 +98,6 @@ export type Preferences = {
   /** When false, others don’t see how far away you are. */
   showDistance?: boolean;
   notifications?: NotificationPrefs;
+  /** Premium advanced Discover filters. */
+  advanced?: AdvancedFilters;
 };

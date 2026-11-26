@@ -1,10 +1,12 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import { onCall } from 'firebase-functions/v2/https';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
 import { ageFromBirthDate, db, requireUid } from './shared';
 
 export const DEFAULT_DAILY_LIKES = 25;
 export const DEFAULT_WEEKLY_SPARKS = 5;
+export const DEFAULT_WEEKLY_BOOSTS = 1;
+export const BOOST_DURATION_MS = 30 * 60 * 1000;
 
 /** Calendar day in India (VOYC Date’s primary market). */
 export function likesDayKey(now = new Date()) {
@@ -52,6 +54,47 @@ export async function readWeeklySparkLimit() {
   const snap = await db().doc('config/limits').get();
   const value = snap.data()?.weeklySparks;
   return typeof value === 'number' && value > 0 ? value : DEFAULT_WEEKLY_SPARKS;
+}
+
+export async function readWeeklyBoostLimit() {
+  const snap = await db().doc('config/limits').get();
+  const value = snap.data()?.weeklyBoosts;
+  return typeof value === 'number' && value > 0 ? value : DEFAULT_WEEKLY_BOOSTS;
+}
+
+export type BoostStatus = {
+  premium: boolean;
+  weeklyLimit: number;
+  usedThisWeek: number;
+  remaining: number;
+  active: boolean;
+  boostedUntil: number | null;
+  weekKey: string;
+};
+
+export async function readBoostStatus(uid: string): Promise<BoostStatus> {
+  const firestore = db();
+  const [userSnap, discoverySnap, limit] = await Promise.all([
+    firestore.doc(`users/${uid}`).get(),
+    firestore.doc(`discovery/${uid}`).get(),
+    readWeeklyBoostLimit(),
+  ]);
+  const user = userSnap.data() ?? {};
+  const premium = isPremium(user);
+  const weekKey = sparksWeekKey();
+  const quota = user.boostQuota;
+  const usedThisWeek = quota?.weekKey === weekKey ? Number(quota.count) || 0 : 0;
+  const boostedUntilMs = discoverySnap.data()?.boostedUntil?.toMillis?.() ?? null;
+  const active = Boolean(boostedUntilMs && boostedUntilMs > Date.now());
+  return {
+    premium,
+    weeklyLimit: limit,
+    usedThisWeek,
+    remaining: premium ? Math.max(0, limit - usedThisWeek) : 0,
+    active,
+    boostedUntil: active ? boostedUntilMs : null,
+    weekKey,
+  };
 }
 
 export const getLikesTab = onCall(async (request) => {
@@ -209,4 +252,66 @@ export const setPremiumStatus = onCall(async (request) => {
       { merge: true },
     );
   return { ok: true, premium: active };
+});
+
+export const getBoostStatus = onCall(async (request) => {
+  const uid = requireUid(request);
+  return readBoostStatus(uid);
+});
+
+/** Premium: 1 boost / week → ~30 minutes near the top of Discover. */
+export const activateBoost = onCall(async (request) => {
+  const uid = requireUid(request);
+  const firestore = db();
+  const userRef = firestore.doc(`users/${uid}`);
+  const discoveryRef = firestore.doc(`discovery/${uid}`);
+  const limit = await readWeeklyBoostLimit();
+
+  return firestore.runTransaction(async (tx) => {
+    const [userSnap, discoverySnap] = await Promise.all([tx.get(userRef), tx.get(discoveryRef)]);
+    const user = userSnap.data() ?? {};
+    if (!isPremium(user)) {
+      throw new HttpsError('permission-denied', 'Boosts are a Premium perk.');
+    }
+    if (!discoverySnap.exists || !discoverySnap.data()?.active) {
+      throw new HttpsError('failed-precondition', 'Finish your profile before boosting.');
+    }
+
+    const boostedUntilMs = discoverySnap.data()?.boostedUntil?.toMillis?.() ?? 0;
+    if (boostedUntilMs > Date.now()) {
+      throw new HttpsError('already-exists', 'Your profile is already boosted.');
+    }
+
+    const weekKey = sparksWeekKey();
+    const quota = user.boostQuota;
+    const used = quota?.weekKey === weekKey ? Number(quota.count) || 0 : 0;
+    if (used >= limit) {
+      throw new HttpsError('resource-exhausted', 'You’ve used this week’s boost. Come back next week.');
+    }
+
+    const until = Timestamp.fromMillis(Date.now() + BOOST_DURATION_MS);
+    tx.set(
+      userRef,
+      {
+        boostQuota: { weekKey, count: used + 1 },
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+    tx.set(
+      discoveryRef,
+      {
+        boostedUntil: until,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+    return {
+      ok: true as const,
+      boostedUntil: until.toMillis(),
+      remaining: Math.max(0, limit - (used + 1)),
+      weeklyLimit: limit,
+      weekKey,
+    };
+  });
 });

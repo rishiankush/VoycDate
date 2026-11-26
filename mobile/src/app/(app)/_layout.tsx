@@ -26,6 +26,7 @@ function AppShell() {
         <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
         <Stack.Screen name="verify" options={{ presentation: 'modal' }} />
         <Stack.Screen name="notifications" />
+        <Stack.Screen name="chat/[matchId]" />
         <Stack.Screen name="match" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
       </Stack>
     </DiscoveryProvider>

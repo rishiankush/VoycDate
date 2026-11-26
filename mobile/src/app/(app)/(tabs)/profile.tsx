@@ -1,19 +1,39 @@
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
-import { BadgeCheck, Check, Crown, Eye, PauseCircle, Settings, ShieldCheck } from 'lucide-react-native';
-import { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { BadgeCheck, Check, Crown, Eye, PauseCircle, Settings, ShieldCheck, Zap } from 'lucide-react-native';
+import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppText, Button, GlowBackground, IconButton, PinkGradient } from '@/components/ui';
+import {
+  AppText,
+  Button,
+  GlowBackground,
+  IconButton,
+  MessageSheet,
+  PinkGradient,
+  type MessageSheetState,
+} from '@/components/ui';
 import { useSession } from '@/features/auth/SessionProvider';
 import { useDiscovery } from '@/features/discover/DiscoveryProvider';
 import { placeLabel } from '@/features/location/deviceLocation';
 import type { Mode } from '@/features/onboarding/types';
+import { activateBoost, fetchBoostStatus, type BoostStatus } from '@/features/premium/premium';
 import { ageFromBirthDate } from '@/features/profile/age';
 import { profileCompleteness } from '@/features/profile/completeness';
 import { useMyProfile } from '@/features/profile/MyProfileProvider';
 import { colors, layout, radii, shadows, spacing } from '@/theme';
+
+function boostCaption(status: BoostStatus | null) {
+  if (!status) return 'Get seen first on Discover';
+  if (status.active && status.boostedUntil) {
+    const mins = Math.max(1, Math.round((status.boostedUntil - Date.now()) / 60_000));
+    return `Live · about ${mins} min left`;
+  }
+  if (!status.premium) return 'Premium · 30 minutes at the top';
+  if (status.remaining <= 0) return 'Used this week · refreshes Monday';
+  return `${status.remaining} left this week · 30 minutes`;
+}
 
 const PREMIUM_PERKS = [
   { label: 'See who liked you', free: false },
@@ -29,6 +49,9 @@ export default function ProfileScreen() {
   const { load } = useDiscovery();
   const [pausing, setPausing] = useState(false);
   const [switchingMode, setSwitchingMode] = useState(false);
+  const [boost, setBoost] = useState<BoostStatus | null>(null);
+  const [boosting, setBoosting] = useState(false);
+  const [notice, setNotice] = useState<MessageSheetState>(null);
   const photo = profile.photos?.[0];
   const { percent } = profileCompleteness(profile);
   const age = record?.birthDate ? ageFromBirthDate(record.birthDate) : null;
@@ -36,6 +59,83 @@ export default function ProfileScreen() {
   const verification = profile.verification?.status ?? 'none';
   const isVerified = verification === 'approved';
   const mode: Mode = profile.mode === 'friends' ? 'friends' : 'date';
+
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      fetchBoostStatus()
+        .then((status) => {
+          if (alive) setBoost(status);
+        })
+        .catch(() => {});
+      return () => {
+        alive = false;
+      };
+    }, []),
+  );
+
+  const onBoost = async () => {
+    if (!isPremium) {
+      setNotice({
+        title: 'Boost with Premium',
+        body: 'One boost a week puts you near the top of Discover for about 30 minutes.',
+        primary: { label: 'Explore Premium', onPress: () => router.push('/(app)/paywall') },
+        secondary: { label: 'Not now', onPress: () => {}, variant: 'secondary' },
+      });
+      return;
+    }
+    if (boost?.active) {
+      setNotice({
+        title: 'You’re already boosted',
+        body: boostCaption(boost),
+      });
+      return;
+    }
+    if (boost && boost.remaining <= 0) {
+      setNotice({
+        title: 'Boost used this week',
+        body: 'Your weekly boost refreshes with Sparks — come back next week.',
+      });
+      return;
+    }
+
+    setBoosting(true);
+    try {
+      const result = await activateBoost();
+      const next = await fetchBoostStatus().catch(() => null);
+      if (next) setBoost(next);
+      else {
+        setBoost((prev) =>
+          prev
+            ? {
+                ...prev,
+                active: true,
+                boostedUntil: result.boostedUntil,
+                remaining: result.remaining,
+                usedThisWeek: prev.weeklyLimit - result.remaining,
+              }
+            : prev,
+        );
+      }
+      setNotice({
+        title: 'You’re boosted',
+        body: 'For the next 30 minutes you’ll show near the top of Discover for people nearby.',
+      });
+    } catch (err) {
+      const code = (err as { code?: string })?.code ?? '';
+      const message =
+        code.includes('resource-exhausted')
+          ? 'You’ve used this week’s boost. Come back next week.'
+          : code.includes('already-exists')
+            ? 'Your profile is already boosted.'
+            : code.includes('permission-denied')
+              ? 'Boosts are a Premium perk.'
+              : 'Check your connection and try again.';
+      setNotice({ title: 'Couldn’t boost', body: message });
+    } finally {
+      setBoosting(false);
+    }
+  };
 
   const togglePause = async () => {
     setPausing(true);
@@ -167,6 +267,21 @@ export default function ProfileScreen() {
             </View>
           </Pressable>
 
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: boosting }}
+            disabled={boosting}
+            onPress={onBoost}
+            style={styles.verifyRow}>
+            <Zap size={18} color={colors.plum} fill={boost?.active ? colors.pink : 'transparent'} />
+            <View style={styles.verifyText}>
+              <AppText variant="bodyStrong">{boost?.active ? 'Boosted' : 'Boost profile'}</AppText>
+              <AppText variant="caption" color="textMuted">
+                {boosting ? 'Starting boost…' : boostCaption(boost)}
+              </AppText>
+            </View>
+          </Pressable>
+
           {paused ? (
             <Pressable onPress={togglePause} style={styles.pauseBanner} disabled={pausing}>
               <PauseCircle size={16} color={colors.plum} />
@@ -249,6 +364,7 @@ export default function ProfileScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
+      <MessageSheet notice={notice} onClose={() => setNotice(null)} />
     </View>
   );
 }

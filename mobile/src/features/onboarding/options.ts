@@ -166,3 +166,5 @@ export const AGE_MAX = 80;
 export const DISTANCE_MIN_KM = 2;
 export const DISTANCE_MAX_KM = 160;
 export const DISTANCE_DEFAULT_KM = 40;
+export const HEIGHT_MIN_CM = 140;
+export const HEIGHT_MAX_CM = 215;

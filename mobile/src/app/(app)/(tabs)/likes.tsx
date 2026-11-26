@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.pinkSoft,
   },
   blurOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(247, 234, 245, 0.28)',
